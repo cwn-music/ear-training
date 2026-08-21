@@ -1,4 +1,4 @@
-// 乐理引擎：音用 MIDI 数字表示（中央 C = 60），音程 = 两个数字之差
+// 乐理引擎：音用 MIDI 数字表示（中央 C = 60）
 
 export interface IntervalDef {
   semitones: number; // 半音数
@@ -26,7 +26,7 @@ export interface Question {
   options: IntervalDef[];
 }
 
-// level 控制解锁多少种音程；wrongStats 让答错过的音程更高频出现
+// level 控制解锁多少种音程；wrongStats 让答错过的内容更高频出现
 export function generateQuestion(
   level: number,
   wrongStats: Record<string, number>
@@ -51,4 +51,50 @@ export function generateQuestion(
   );
 
   return { root, answer, options };
+}
+
+// ---------- 识谱模式 ----------
+
+// 音名 → 唱名（固定唱名法，C = Do）
+const SOLFEGE: Record<number, string> = {
+  0: "Do",
+  2: "Re",
+  4: "Mi",
+  5: "Fa",
+  7: "Sol",
+  9: "La",
+  11: "Si",
+};
+
+export function midiToSolfege(midi: number): string {
+  return SOLFEGE[midi % 12] ?? "?";
+}
+
+// 第 1 关音池：Fa Sol La Si Do（同《法国儿童视唱教程》第 1 课的五个音）
+export const NOTE_POOL = [65, 67, 69, 71, 72]; // F4 G4 A4 B4 C5
+
+export interface NoteQuestion {
+  midi: number; // 要认的音
+  answer: string; // 正确唱名
+  options: string[]; // 4 个选项
+}
+
+export function generateNoteQuestion(
+  wrongStats: Record<string, number>
+): NoteQuestion {
+  // 错题加权
+  const weighted = NOTE_POOL.flatMap((m) =>
+    Array(1 + (wrongStats[midiToSolfege(m)] ?? 0)).fill(m)
+  );
+  const midi = weighted[Math.floor(Math.random() * weighted.length)];
+  const answer = midiToSolfege(midi);
+
+  const allNames = ["Do", "Re", "Mi", "Fa", "Sol", "La", "Si"];
+  const distractors = allNames
+    .filter((n) => n !== answer)
+    .sort(() => Math.random() - 0.5)
+    .slice(0, 3);
+  const options = [...distractors, answer].sort(() => Math.random() - 0.5);
+
+  return { midi, answer, options };
 }

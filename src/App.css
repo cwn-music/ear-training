@@ -53,3 +53,10 @@
 }
 .opt.correct { background: #58cc02; border-color: #46a302; }
 .opt.wrong { background: #ff4b4b; border-color: #cc2f2f; }
+
+/* 五线谱白卡片 */
+.staffCard {
+  background: #ffffff;
+  border-radius: 14px;
+  padding: 4px 10px;
+}

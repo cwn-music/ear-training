@@ -51,6 +51,12 @@ export async function initAudio(): Promise<void> {
   await Tone.loaded(); // 等音色全部加载完再开始
 }
 
+// 弹单个音
+export function playNote(midi: number): void {
+  if (!piano) return;
+  piano.triggerAttackRelease(midiToNote(midi), 1.0, Tone.now());
+}
+
 // 先后弹两个音：m1 响起，0.9 秒后 m2 响起
 export function playInterval(midi1: number, midi2: number): void {
   if (!piano) return;
