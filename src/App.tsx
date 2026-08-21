@@ -1,173 +1,244 @@
 import { useState } from "react";
 import { initAudio, playInterval, playNote } from "./audio";
-import { generateQuestion, generateNoteQuestion } from "./theory";
-import type { Question, NoteQuestion } from "./theory";
+import { LEVELS, type Level } from "./lessons";
+import { generateSession, type AnyQuestion } from "./theory";
 import Staff from "./Staff";
 import "./App.css";
 
-const TOTAL = 10; // 每组 10 题
+interface Progress {
+  unlocked: number;
+  best: Record<number, number>;
+}
 
-type Mode = "interval" | "note";
-
-// 连胜逻辑：今天第一次练习时更新；昨天练过则 +1，否则归零重计
-function updateStreak(): number {
-  const today = new Date().toDateString();
-  const last = localStorage.getItem("lastDate");
-  let streak = Number(localStorage.getItem("streak") ?? "0");
-  if (last !== today) {
-    const yesterday = new Date(Date.now() - 864e5).toDateString();
-    streak = last === yesterday ? streak + 1 : 1;
-    localStorage.setItem("streak", String(streak));
-    localStorage.setItem("lastDate", today);
+function loadProgress(): Progress {
+  try {
+    const raw = localStorage.getItem("progress");
+    if (raw) return JSON.parse(raw);
+  } catch {
+    /* 忽略损坏的数据 */
   }
-  return streak;
+  return { unlocked: 1, best: {} };
 }
 
 function loadWrongStats(): Record<string, number> {
   try {
-    return JSON.parse(localStorage.getItem("wrongStats") ?? "{}");
+    const raw = localStorage.getItem("wrongStats");
+    if (raw) return JSON.parse(raw);
   } catch {
-    return {};
+    /* 忽略损坏的数据 */
   }
+  return {};
+}
+
+function todayStr(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function updateStreak(): number {
+  const today = todayStr();
+  const last = localStorage.getItem("lastDate");
+  let streak = Number(localStorage.getItem("streak") ?? "0");
+  if (last === today) return streak;
+  const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+  streak = last === yesterday ? streak + 1 : 1;
+  localStorage.setItem("lastDate", today);
+  localStorage.setItem("streak", String(streak));
+  return streak;
 }
 
 export default function App() {
-  const [phase, setPhase] = useState<"start" | "playing" | "done">("start");
-  const [mode, setMode] = useState<Mode>("interval");
-  const [q, setQ] = useState<Question | null>(null); // 练耳题
-  const [nq, setNq] = useState<NoteQuestion | null>(null); // 识谱题
-  const [index, setIndex] = useState(0);
-  const [score, setScore] = useState(0);
-  const [picked, setPicked] = useState<string | null>(null);
-  const [wrongStats, setWrongStats] = useState<Record<string, number>>(
-    loadWrongStats
-  );
+  const [phase, setPhase] = useState<"map" | "playing" | "done">("map");
+  const [progress, setProgress] = useState<Progress>(loadProgress);
   const [streak, setStreak] = useState(() =>
     Number(localStorage.getItem("streak") ?? "0")
   );
+  const [level, setLevel] = useState<Level>(LEVELS[0]);
+  const [questions, setQuestions] = useState<AnyQuestion[]>([]);
+  const [index, setIndex] = useState(0);
+  const [score, setScore] = useState(0);
+  const [picked, setPicked] = useState<string | null>(null);
+  const [lastPct, setLastPct] = useState(0);
 
-  function nextQuestion(stats: Record<string, number>, m: Mode) {
-    setPicked(null);
-    if (m === "interval") {
-      const question = generateQuestion(3, stats); // 先解锁前 5 个音程
-      setQ(question);
-      playInterval(question.root, question.root + question.answer.semitones);
-    } else {
-      setNq(generateNoteQuestion(stats)); // 识谱题不出声
-    }
-  }
-
-  async function start(m: Mode) {
+  async function start(lv: Level) {
     await initAudio();
-    setMode(m);
     setStreak(updateStreak());
+    const qs = generateSession(lv, loadWrongStats());
+    setLevel(lv);
+    setQuestions(qs);
     setIndex(0);
     setScore(0);
+    setPicked(null);
     setPhase("playing");
-    nextQuestion(wrongStats, m);
+    const first = qs[0];
+    if (first.kind === "interval") playInterval(first.midi1, first.midi2);
   }
 
-  function answer(name: string) {
+  function replay(q: AnyQuestion) {
+    if (q.kind === "interval") playInterval(q.midi1, q.midi2);
+    else playNote(q.midi);
+  }
+
+  function recordWrong(q: AnyQuestion) {
+    const stats = loadWrongStats();
+    stats[q.wrongKey] = (stats[q.wrongKey] ?? 0) + 1;
+    localStorage.setItem("wrongStats", JSON.stringify(stats));
+  }
+
+  function answer(opt: string) {
     if (picked) return;
-    const correctName = mode === "interval" ? q?.answer.name : nq?.answer;
-    if (!correctName) return;
-    setPicked(name);
-    let stats = wrongStats;
-    if (name === correctName) {
-      setScore((s) => s + 10);
-    } else {
-      stats = { ...wrongStats, [correctName]: (wrongStats[correctName] ?? 0) + 1 };
-      setWrongStats(stats);
-      localStorage.setItem("wrongStats", JSON.stringify(stats));
-    }
+    setPicked(opt);
+    const q = questions[index];
+    const correct = opt === q.answer;
+    if (!correct) recordWrong(q);
+    const finalScore = score + (correct ? 1 : 0);
+    if (correct) setScore(finalScore);
     setTimeout(() => {
-      if (index + 1 >= TOTAL) {
+      const ni = index + 1;
+      if (ni >= questions.length) {
+        const pct = Math.round((finalScore / questions.length) * 100);
+        setLastPct(pct);
+        const p: Progress = {
+          unlocked: progress.unlocked,
+          best: { ...progress.best },
+        };
+        p.best[level.id] = Math.max(p.best[level.id] ?? 0, pct);
+        if (pct >= 80 && level.id === p.unlocked && p.unlocked < LEVELS.length) {
+          p.unlocked += 1;
+        }
+        setProgress(p);
+        localStorage.setItem("progress", JSON.stringify(p));
         setPhase("done");
       } else {
-        setIndex((i) => i + 1);
-        nextQuestion(stats, mode);
+        setIndex(ni);
+        setPicked(null);
+        const nq = questions[ni];
+        if (nq.kind === "interval") playInterval(nq.midi1, nq.midi2);
       }
     }, 1200);
   }
 
-  // ---------- 页面 ----------
-
-  if (phase === "start") {
+  // ---------- 课程地图 ----------
+  if (phase === "map") {
     return (
       <div className="page">
-        <div className="logo">练耳鸭</div>
-        <div className="meta">🔥 连续练习 {streak} 天</div>
-        <button className="btn" onClick={() => start("interval")}>
-          🎧 练耳 · 音程听辨
-        </button>
-        <button className="btn" onClick={() => start("note")}>
-          🎼 识谱 · 看谱认音
-        </button>
-        <div className="meta">每组 10 题 · 错的内容会自动多出现</div>
-      </div>
-    );
-  }
-
-  if (phase === "done") {
-    return (
-      <div className="page">
-        <div className="logo">🎉</div>
-        <div className="big">本组得分 {score}</div>
-        <div className="meta">
-          答对 {score / 10} / {TOTAL} 题 · 🔥 连续 {streak} 天
+        <header className="topbar">
+          <div className="logo">练耳鸭</div>
+          <div className="streak">🔥 连续练习 {streak} 天</div>
+        </header>
+        <p className="hint">每课 10 题，正确率 ≥80% 解锁下一课</p>
+        <div className="levelList">
+          {LEVELS.map((lv) => {
+            const locked = lv.id > progress.unlocked;
+            const best = progress.best[lv.id];
+            const passed = (best ?? 0) >= 80;
+            const current = lv.id === progress.unlocked && !passed;
+            return (
+              <button
+                key={lv.id}
+                className={
+                  "levelCard" +
+                  (locked ? " locked" : "") +
+                  (passed ? " passed" : "") +
+                  (current ? " current" : "")
+                }
+                disabled={locked}
+                onClick={() => start(lv)}
+              >
+                <span className="lvBadge">
+                  {locked ? "🔒" : passed ? "✓" : lv.id}
+                </span>
+                <span className="lvText">
+                  <span className="lvTitle">
+                    第 {lv.id} 课 · {lv.title}
+                    {lv.review ? " ★" : ""}
+                  </span>
+                  <span className="lvDesc">{lv.desc}</span>
+                </span>
+                {best !== undefined && !locked && (
+                  <span className="lvBest">{best}%</span>
+                )}
+              </button>
+            );
+          })}
         </div>
-        <button className="btn" onClick={() => start(mode)}>再来一组</button>
-        <button className="replay" onClick={() => setPhase("start")}>
-          换个玩法
+        <p className="hint small">做错的内容会自动多出现 · 带 ★ 的是复习课</p>
+      </div>
+    );
+  }
+
+  // ---------- 结算页 ----------
+  if (phase === "done") {
+    const passed = lastPct >= 80;
+    return (
+      <div className="page center">
+        <div className="doneEmoji">{passed ? "🎉" : "💪"}</div>
+        <h1 className="big">{lastPct}%</h1>
+        <p className="meta">
+          {passed
+            ? level.id === LEVELS.length
+              ? "恭喜！你完成了全部课程！"
+              : "达标！下一课已解锁"
+            : "差一点点，再练一组就能解锁"}
+        </p>
+        <button className="btn" onClick={() => start(level)}>
+          再来一组
+        </button>
+        <button className="btn ghost" onClick={() => setPhase("map")}>
+          返回课程
         </button>
       </div>
     );
   }
 
-  const isInterval = mode === "interval";
-  const options = isInterval ? q?.options.map((o) => o.name) : nq?.options;
-  const answerName = isInterval ? q?.answer.name : nq?.answer;
-
+  // ---------- 练习页 ----------
+  const q = questions[index];
   return (
     <div className="page">
-      <div className="meta">
-        第 {index + 1} / {TOTAL} 题 · XP {score}
+      <div className="sessionTop">
+        <button className="closeBtn" onClick={() => setPhase("map")}>
+          ✕
+        </button>
+        <div className="track">
+          <div
+            className="fill"
+            style={{ width: `${(index / questions.length) * 100}%` }}
+          />
+        </div>
+        <span className="counter">
+          {index + 1}/{questions.length}
+        </span>
       </div>
-      {isInterval ? (
-        <>
-          <div className="big">🎧 这是什么音程？</div>
-          <button
-            className="replay"
-            onClick={() =>
-              q && playInterval(q.root, q.root + q.answer.semitones)
-            }
-          >
-            🔁 再听一遍
-          </button>
-        </>
-      ) : (
-        <>
-          <div className="big">🎼 这个音唱什么？</div>
-          {nq && <Staff midi={nq.midi} />}
-          <button className="replay" onClick={() => nq && playNote(nq.midi)}>
-            🔊 听一听
-          </button>
-        </>
-      )}
+
+      <p className="qTitle">
+        {q.kind === "note" ? "这个音唱什么？" : "这两个音是什么音程？"}
+      </p>
+
+      {q.kind === "note" && <Staff midi={q.midi} clef={q.clef} />}
+
+      <button className="replay" onClick={() => replay(q)}>
+        {q.kind === "note" ? "🔊 听一听" : "🔊 再听一遍"}
+      </button>
+
       <div className="options">
-        {options?.map((name) => {
+        {q.options.map((opt) => {
           let cls = "opt";
           if (picked) {
-            if (name === answerName) cls += " correct";
-            else if (name === picked) cls += " wrong";
+            if (opt === q.answer) cls += " correct";
+            else if (opt === picked) cls += " wrong";
           }
           return (
-            <button key={name} className={cls} onClick={() => answer(name)}>
-              {name}
+            <button key={opt} className={cls} onClick={() => answer(opt)}>
+              {opt}
             </button>
           );
         })}
       </div>
+
+      {picked && (
+        <p className={"feedback " + (picked === q.answer ? "ok" : "no")}>
+          {picked === q.answer ? "答对了！" : `正确答案：${q.answer}`}
+        </p>
+      )}
     </div>
   );
 }

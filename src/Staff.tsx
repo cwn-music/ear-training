@@ -1,45 +1,45 @@
 import { useEffect, useRef } from "react";
 import { Renderer, Stave, StaveNote, Voice, Formatter } from "vexflow";
-import { midiToNote } from "./audio";
+import type { Clef } from "./lessons";
 
-// 把 "F4" 转成 VexFlow 需要的 "f/4" 格式
-function toVexKey(note: string): string {
-  const m = note.match(/^([A-G]#?)(\d)$/);
-  if (!m) return "c/4";
-  return `${m[1].toLowerCase()}/${m[2]}`;
+function toVexKey(midi: number): string {
+  const names = ["c", "c#", "d", "d#", "e", "f", "f#", "g", "g#", "a", "a#", "b"];
+  const octave = Math.floor(midi / 12) - 1;
+  return names[midi % 12] + "/" + octave;
 }
 
-// 在高音谱表上画一个音
-export default function Staff({ midi }: { midi: number }) {
+export default function Staff({
+  midi,
+  clef = "treble",
+}: {
+  midi: number;
+  clef?: Clef;
+}) {
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const div = ref.current;
     if (!div) return;
-    div.innerHTML = ""; // 清空上一次的画
-
+    div.innerHTML = "";
     const renderer = new Renderer(div, Renderer.Backends.SVG);
     renderer.resize(260, 150);
-    const context = renderer.getContext();
-
+    const ctx = renderer.getContext();
     const stave = new Stave(10, 25, 240);
-    stave.addClef("treble");
-    stave.setContext(context).draw();
-
+    stave.addClef(clef);
+    stave.setContext(ctx).draw();
     const note = new StaveNote({
-      clef: "treble",
-      keys: [toVexKey(midiToNote(midi))],
-      duration: "w", // 全音符
+      keys: [toVexKey(midi)],
+      duration: "w",
+      clef: clef,
     });
     const voice = new Voice({ numBeats: 4, beatValue: 4 }).setStrict(false);
     voice.addTickables([note]);
     new Formatter().joinVoices([voice]).format([voice], 170);
-    voice.draw(context, stave);
-
+    voice.draw(ctx, stave);
     return () => {
       div.innerHTML = "";
     };
-  }, [midi]);
+  }, [midi, clef]);
 
   return <div ref={ref} className="staffCard" />;
 }
