@@ -276,3 +276,91 @@ body {
 .btn.ghost:hover {
   background: var(--accent-soft);
 }
+/* ===== 学习模式与跟唱 ===== */
+.learnCard {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  padding: 28px 24px;
+  text-align: center;
+}
+.learnTag {
+  display: inline-block;
+  font-size: 13px;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-radius: 99px;
+  padding: 4px 14px;
+  margin-bottom: 14px;
+}
+.learnTitle {
+  font-size: 24px;
+  font-weight: 800;
+  margin-bottom: 10px;
+}
+.learnText {
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1.8;
+  margin-bottom: 18px;
+}
+.noteName {
+  font-size: 44px;
+  font-weight: 800;
+  color: var(--accent);
+  margin: 10px 0 4px;
+}
+.stepList {
+  text-align: left;
+  max-width: 300px;
+  margin: 0 auto 18px;
+  font-size: 15px;
+  line-height: 2;
+}
+.learnNav {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  margin-top: 18px;
+}
+.learnNav .btn {
+  width: auto;
+  margin: 0;
+  padding: 14px 28px;
+}
+.singBox {
+  text-align: center;
+  margin-top: 8px;
+}
+.micBtn {
+  padding: 12px 26px;
+  font-size: 16px;
+  font-weight: 700;
+  font-family: inherit;
+  color: #fff;
+  background: var(--accent);
+  border: none;
+  border-radius: 99px;
+  cursor: pointer;
+}
+.micBtn:hover {
+  background: var(--accent-dark);
+}
+.hearBox {
+  font-size: 16px;
+  background: var(--accent-soft);
+  border: 1px solid #f2d9c4;
+  border-radius: 12px;
+  padding: 14px;
+}
+.hearHint {
+  font-size: 13px;
+  color: var(--muted);
+  margin-top: 6px;
+}
+/* 程度测试按钮 */
+.mapTest {
+  width: 100%;
+  max-width: none;
+  margin-bottom: 18px;
+}
