@@ -1,12 +1,22 @@
 import { useState } from "react";
-import { initAudio, playInterval, playNote } from "./audio";
-import { LEVELS, type Level } from "./lessons";
+import {
+  initAudio,
+  initInstruments,
+  playInterval,
+  playNote,
+  playHarmonic,
+  playMelody,
+  playRhythm,
+  playInstrumentMelody,
+} from "./audio";
+import { LEVELS, UNITS, INSTRUMENTS, type Level } from "./lessons";
 import {
   generateSession,
   generatePlacement,
   type AnyQuestion,
 } from "./theory";
 import Staff from "./Staff";
+import MelodyStaff from "./MelodyStaff";
 import Learn from "./Learn";
 import SingTask from "./Sing";
 import "./App.css";
@@ -52,7 +62,6 @@ function updateStreak(): number {
   return streak;
 }
 
-// 程度测试结果 -> 建议起始课
 function suggestLevel(score: number, total: number): { tier: string; startId: number } {
   const pct = score / total;
   if (pct <= 0.33) return { tier: "零基础", startId: 0 };
@@ -61,13 +70,30 @@ function suggestLevel(score: number, total: number): { tier: string; startId: nu
   return { tier: "专业水平", startId: 10 };
 }
 
-const Q_TITLES: Record<string, string> = {
-  note: "这个音唱什么？",
-  interval: "这两个音是什么音程？",
-  pitch: "第二个音比第一个音……",
-  stepleap: "这两个音是「级进」还是「跳进」？",
-  sing: "先听范唱，再唱出这个音",
-};
+function qTitle(q: AnyQuestion): string {
+  switch (q.kind) {
+    case "note":
+      return "这个音唱什么？";
+    case "interval":
+      return q.harmonic
+        ? "同时响起的两个音是什么音程？"
+        : "先后响起的两个音是什么音程？";
+    case "pitch":
+      return "第二个音比第一个音……";
+    case "stepleap":
+      return "这两个音是「级进」还是「跳进」？";
+    case "melody":
+      return "空缺（休止符）的位置是哪个音？";
+    case "rhythm":
+      return "你听到的是哪一条节奏？";
+    case "scale":
+      return "这条音阶是大调还是小调？";
+    case "timbre":
+      return "这段旋律是哪种乐器演奏的？";
+    case "sing":
+      return "先听范唱，再唱出这个音";
+  }
+}
 
 export default function App() {
   const [phase, setPhase] = useState<
@@ -86,21 +112,19 @@ export default function App() {
   const [lastPct, setLastPct] = useState(0);
   const [placementScore, setPlacementScore] = useState(0);
 
-  // 点课程卡片：初始化音频 -> 进入学习模式
   async function openLevel(lv: Level) {
     await initAudio();
+    if (lv.ear === "timbre") await initInstruments(lv.instruments ?? []);
     setLevel(lv);
     setIsPlacement(false);
     setPhase("learn");
   }
 
-  // 开始学习/跳过学习 -> 正式闯关
   function beginQuiz() {
     setStreak(updateStreak());
     startRound(generateSession(level, loadWrongStats()), false);
   }
 
-  // 程度测试
   async function startPlacement() {
     await initAudio();
     startRound(generatePlacement(loadWrongStats()), true);
@@ -117,9 +141,30 @@ export default function App() {
   }
 
   function autoplay(q: AnyQuestion) {
-    if (q.kind === "interval" || q.kind === "pitch" || q.kind === "stepleap")
-      playInterval(q.midi1, q.midi2);
-    else playNote(q.midi);
+    switch (q.kind) {
+      case "interval":
+        if (q.harmonic) playHarmonic(q.midi1, q.midi2);
+        else playInterval(q.midi1, q.midi2);
+        break;
+      case "pitch":
+      case "stepleap":
+        playInterval(q.midi1, q.midi2);
+        break;
+      case "melody":
+        playMelody(q.notes);
+        break;
+      case "rhythm":
+        playRhythm(q.tokens);
+        break;
+      case "scale":
+        playMelody(q.midis, 0.45);
+        break;
+      case "timbre":
+        playInstrumentMelody(q.instrument, q.midis);
+        break;
+      default:
+        playNote(q.midi);
+    }
   }
 
   function recordWrong(q: AnyQuestion) {
@@ -128,7 +173,6 @@ export default function App() {
     localStorage.setItem("wrongStats", JSON.stringify(stats));
   }
 
-  // 一题结束
   function finish(correct: boolean, q: AnyQuestion, delay = 1200) {
     if (!correct) recordWrong(q);
     const finalScore = score + (correct ? 1 : 0);
@@ -169,7 +213,6 @@ export default function App() {
     finish(opt === q.answer, q);
   }
 
-  // 采用程度测试的建议
   function applySuggestion(startId: number) {
     const p: Progress = { unlocked: startId, best: {} };
     for (const lv of LEVELS) {
@@ -185,10 +228,14 @@ export default function App() {
 
   // ---------- 课程地图 ----------
   if (phase === "map") {
+    let lastUnit = 0;
     return (
       <div className="page">
-        <header className="topbar">
-          <div className="logo">练耳鸭</div>
+        <header className="brand">
+          <img src="/muse.png" alt="缪斯徽章" className="brandImg" />
+          <div className="logo">缪斯</div>
+          <div className="logoSub">MVSE · 视唱练耳</div>
+          <div className="meander" />
           <div className="streak">🔥 连续练习 {streak} 天</div>
         </header>
         <p className="hint">先学新知识，再闯关：每课 10 题，≥80% 解锁下一课</p>
@@ -201,32 +248,42 @@ export default function App() {
             const best = progress.best[lv.id];
             const passed = (best ?? 0) >= 80;
             const current = lv.id === progress.unlocked && !passed;
+            const showUnit = lv.unit !== lastUnit;
+            lastUnit = lv.unit;
             return (
-              <button
-                key={lv.id}
-                className={
-                  "levelCard" +
-                  (locked ? " locked" : "") +
-                  (passed ? " passed" : "") +
-                  (current ? " current" : "")
-                }
-                disabled={locked}
-                onClick={() => openLevel(lv)}
-              >
-                <span className="lvBadge">
-                  {locked ? "🔒" : passed ? "✓" : lv.id === 0 ? "★" : lv.id}
-                </span>
-                <span className="lvText">
-                  <span className="lvTitle">
-                    {levelName(lv)} · {lv.title}
-                    {lv.review ? " ★" : ""}
-                  </span>
-                  <span className="lvDesc">{lv.desc}</span>
-                </span>
-                {best !== undefined && !locked && (
-                  <span className="lvBest">{best}%</span>
+              <div key={lv.id}>
+                {showUnit && (
+                  <div className="unitHeader">
+                    <span className="unitLine" />
+                    <span className="unitName">{UNITS[lv.unit]}</span>
+                    <span className="unitLine" />
+                  </div>
                 )}
-              </button>
+                <button
+                  className={
+                    "levelCard" +
+                    (locked ? " locked" : "") +
+                    (passed ? " passed" : "") +
+                    (current ? " current" : "")
+                  }
+                  disabled={locked}
+                  onClick={() => openLevel(lv)}
+                >
+                  <span className="lvBadge">
+                    {locked ? "🔒" : passed ? "✓" : lv.id === 0 ? "★" : lv.id}
+                  </span>
+                  <span className="lvText">
+                    <span className="lvTitle">
+                      {levelName(lv)} · {lv.title}
+                      {lv.review ? " ★" : ""}
+                    </span>
+                    <span className="lvDesc">{lv.desc}</span>
+                  </span>
+                  {best !== undefined && !locked && (
+                    <span className="lvBest">{best}%</span>
+                  )}
+                </button>
+              </div>
             );
           })}
         </div>
@@ -315,7 +372,7 @@ export default function App() {
 
       {q.kind === "sing" ? (
         <>
-          <p className="qTitle">{Q_TITLES.sing}</p>
+          <p className="qTitle">{qTitle(q)}</p>
           <Staff midi={q.midi} clef={q.clef} />
           <button className="replay" onClick={() => autoplay(q)}>
             🔊 听范唱
@@ -324,20 +381,30 @@ export default function App() {
         </>
       ) : (
         <>
-          <p className="qTitle">{Q_TITLES[q.kind]}</p>
+          <p className="qTitle">{qTitle(q)}</p>
           {q.kind === "note" && <Staff midi={q.midi} clef={q.clef} />}
+          {q.kind === "melody" && (
+            <MelodyStaff notes={q.notes} gapIndex={q.gapIndex} clef={q.clef} />
+          )}
           <button className="replay" onClick={() => autoplay(q)}>
             {q.kind === "note" ? "🔊 听一听" : "🔊 再听一遍"}
           </button>
-          <div className="options">
+          <div className={"options" + (q.kind === "rhythm" ? " oneCol" : "")}>
             {q.options.map((opt) => {
               let cls = "opt";
+              if (q.kind === "rhythm") cls += " rhythmOpt";
+              const inst =
+                q.kind === "timbre"
+                  ? INSTRUMENTS.find((x) => x.name === opt)
+                  : undefined;
+              if (inst) cls += " instOpt";
               if (picked) {
                 if (opt === q.answer) cls += " correct";
                 else if (opt === picked) cls += " wrong";
               }
               return (
                 <button key={opt} className={cls} onClick={() => answer(opt)}>
+                  {inst && <img src={inst.img} alt="" />}
                   {opt}
                 </button>
               );

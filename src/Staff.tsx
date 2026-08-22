@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { Renderer, Stave, StaveNote, Voice, Formatter } from "vexflow";
+import { Renderer, Stave, StaveNote, Voice, Formatter, Accidental } from "vexflow";
 import type { Clef } from "./lessons";
 
 function toVexKey(midi: number): string {
@@ -8,11 +8,14 @@ function toVexKey(midi: number): string {
   return names[midi % 12] + "/" + octave;
 }
 
+// 单音：只传 midi；和弦（和声音程）：再传 midi2
 export default function Staff({
   midi,
+  midi2,
   clef = "treble",
 }: {
   midi: number;
+  midi2?: number;
   clef?: Clef;
 }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -27,10 +30,10 @@ export default function Staff({
     const stave = new Stave(10, 25, 240);
     stave.addClef(clef);
     stave.setContext(ctx).draw();
-    const note = new StaveNote({
-      keys: [toVexKey(midi)],
-      duration: "w",
-      clef: clef,
+    const keys = midi2 === undefined ? [toVexKey(midi)] : [toVexKey(midi), toVexKey(midi2)];
+    const note = new StaveNote({ keys: keys, duration: "w", clef: clef });
+    keys.forEach((k, i) => {
+      if (k.includes("#")) note.addModifier(new Accidental("#"), i);
     });
     const voice = new Voice({ numBeats: 4, beatValue: 4 }).setStrict(false);
     voice.addTickables([note]);
@@ -39,7 +42,7 @@ export default function Staff({
     return () => {
       div.innerHTML = "";
     };
-  }, [midi, clef]);
+  }, [midi, midi2, clef]);
 
   return <div ref={ref} className="staffCard" />;
 }
