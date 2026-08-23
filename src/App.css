@@ -1,494 +1,278 @@
+/* 缪斯 Muse · 希腊古典 × 纸质绘本 */
 :root {
-  --bg: #f4f0e6;
-  --card: #fbf9f2;
-  --ink: #2b2a26;
-  --muted: #8b8371;
-  --line: #ddd3bd;
-  --accent: #3d5a73;
-  --accent-dark: #2f485c;
-  --accent-soft: #e4ebf1;
-  --gold: #a98a3a;
-  --gold-soft: #f0e7cf;
-  --green: #5f7f4e;
-  --green-soft: #e7eddf;
-  --red: #a4452c;
-  --red-soft: #f3e2da;
-  --serif: "Noto Serif SC", "Songti SC", "STSong", "SimSun", serif;
+  --paper: #f6f1e6;
+  --card: #fffdf7;
+  --kraft: #dcc9a3;
+  --ink: #22304a;
+  --slate: #3b4a5c;
+  --gold: #b9962f;
+  --red: #b23b2e;
+  --green: #4a7d4f;
 }
 
+* { box-sizing: border-box; }
+
 body {
-  background: var(--bg);
+  margin: 0;
+  background: var(--paper);
   color: var(--ink);
-  font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  font-family: 'PingFang SC', 'Microsoft YaHei', 'Noto Sans SC', sans-serif;
 }
 
 .page {
-  max-width: 560px;
+  max-width: 720px;
   margin: 0 auto;
-  padding: 32px 20px 64px;
+  padding: 20px 18px 60px;
 }
 
-.center {
-  text-align: center;
-  padding-top: 80px;
-}
-
-/* ===== 品牌区 ===== */
 .brand {
-  text-align: center;
-  margin-bottom: 10px;
-}
-.brandImg {
-  width: 110px;
-  height: 110px;
-  object-fit: contain;
-  margin-bottom: 4px;
-}
-.logo {
-  font-family: var(--serif);
-  font-size: 40px;
-  font-weight: 800;
-  color: var(--ink);
-  letter-spacing: 14px;
-  text-indent: 14px;
-}
-.logoSub {
-  font-family: var(--serif);
-  font-size: 13px;
-  letter-spacing: 6px;
-  color: var(--gold);
-  margin-top: 4px;
-}
-.meander {
-  height: 12px;
-  margin: 14px auto 8px;
-  max-width: 320px;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24'%3E%3Cpath d='M2 22V6h20v16H10v-8h8' stroke='%23a98a3a' stroke-width='2' fill='none'/%3E%3C/svg%3E");
-  background-repeat: repeat-x;
-  background-size: 24px 24px;
-  opacity: 0.75;
-}
-.streak {
-  color: var(--muted);
-  font-size: 14px;
-}
-.hint {
-  color: var(--muted);
-  font-size: 14px;
-  margin: 14px 0 18px;
-  text-align: center;
-}
-.hint.small {
-  margin-top: 20px;
-  font-size: 13px;
-}
-
-/* ===== 单元标题 ===== */
-.unitHeader {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin: 26px 0 14px;
-}
-.unitLine {
-  flex: 1;
-  height: 1px;
-  background: var(--gold);
-  opacity: 0.5;
-}
-.unitName {
-  font-family: var(--serif);
-  font-size: 15px;
-  letter-spacing: 3px;
-  color: var(--gold);
-  white-space: nowrap;
-}
-
-/* ===== 课程卡片 ===== */
-.levelList {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-.levelCard {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  width: 100%;
-  text-align: left;
-  padding: 16px;
-  background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  cursor: pointer;
-  font-family: inherit;
-  transition: transform 0.12s ease, box-shadow 0.12s ease;
-}
-.levelCard:not(.locked):hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(43, 42, 38, 0.1);
-}
-.lvBadge {
-  flex: none;
-  width: 46px;
-  height: 46px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-family: var(--serif);
-  font-size: 18px;
-  font-weight: 700;
-  background: var(--accent-soft);
-  color: var(--accent);
-  border: 1px solid #c9d5de;
-}
-.levelCard.passed .lvBadge {
-  background: var(--gold);
-  border-color: var(--gold);
-  color: #fff;
-}
-.levelCard.current {
-  border: 2px solid var(--gold);
-  box-shadow: 0 6px 18px rgba(169, 138, 58, 0.22);
-}
-.levelCard.locked {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-.levelCard.locked .lvBadge {
-  background: #ede8da;
-  border-color: var(--line);
-  color: var(--muted);
-}
-.lvText {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
-.lvTitle {
-  font-size: 16px;
-  font-weight: 700;
-}
-.lvDesc {
-  font-size: 13px;
-  color: var(--muted);
-}
-.lvBest {
-  font-family: var(--serif);
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--gold);
-}
-
-/* ===== 练习页 ===== */
-.sessionTop {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 28px;
-}
-.closeBtn {
-  border: none;
-  background: none;
-  font-size: 18px;
-  color: var(--muted);
-  cursor: pointer;
-  padding: 4px 8px;
-}
-.track {
-  flex: 1;
-  height: 10px;
-  background: #e6ddc8;
-  border-radius: 99px;
-  overflow: hidden;
-}
-.fill {
-  height: 100%;
-  background: var(--accent);
-  border-radius: 99px;
-  transition: width 0.3s ease;
-}
-.counter {
-  font-size: 14px;
-  color: var(--muted);
-  min-width: 38px;
-  text-align: right;
-}
-.qTitle {
-  font-family: var(--serif);
+  font-family: 'SimSun', 'Songti SC', serif;
   font-size: 22px;
-  font-weight: 700;
+  letter-spacing: 6px;
+  color: var(--slate);
+  border-bottom: 2px solid var(--gold);
+  padding-bottom: 10px;
   margin-bottom: 18px;
 }
-.staffCard {
-  background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  padding: 4px 10px;
-  width: fit-content;
-  margin: 0 auto 12px;
-}
-.replay {
-  display: block;
-  margin: 0 auto 22px;
-  padding: 10px 22px;
-  font-size: 15px;
-  font-family: inherit;
-  color: var(--accent);
-  background: var(--accent-soft);
-  border: 1px solid #c9d5de;
-  border-radius: 99px;
-  cursor: pointer;
-}
-.options {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-}
-.options.oneCol {
-  grid-template-columns: 1fr;
-}
-.opt {
-  padding: 18px 12px;
-  font-size: 17px;
-  font-weight: 700;
-  font-family: inherit;
-  color: var(--ink);
-  background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  cursor: pointer;
-  transition: transform 0.1s ease;
-}
-.opt:hover {
-  transform: translateY(-2px);
-}
-.opt.rhythmOpt {
-  font-size: 22px;
-  letter-spacing: 3px;
-  padding: 16px 18px;
-  text-align: center;
-}
-.opt.correct {
-  background: var(--green-soft);
-  border-color: var(--green);
-  color: var(--green);
-}
-.opt.wrong {
-  background: var(--red-soft);
-  border-color: var(--red);
-  color: var(--red);
-}
-.feedback {
-  margin-top: 18px;
-  text-align: center;
-  font-weight: 700;
-}
-.feedback.ok {
-  color: var(--green);
-}
-.feedback.no {
-  color: var(--red);
-}
 
-/* ===== 结算页 ===== */
-.doneEmoji {
-  font-size: 56px;
-  margin-bottom: 12px;
-}
-.big {
-  font-family: var(--serif);
-  font-size: 52px;
-  color: var(--gold);
-  margin-bottom: 8px;
-}
-.meta {
-  color: var(--muted);
-  margin-bottom: 32px;
-  line-height: 1.8;
-}
-.btn {
-  display: block;
-  width: 100%;
-  max-width: 320px;
-  margin: 0 auto 12px;
-  padding: 16px;
-  font-size: 17px;
-  font-weight: 700;
-  font-family: inherit;
-  color: #fff;
-  background: var(--accent);
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  box-shadow: 0 6px 16px rgba(61, 90, 115, 0.3);
-}
-.btn:hover {
-  background: var(--accent-dark);
-}
-.btn.ghost {
-  color: var(--accent);
-  background: transparent;
-  border: 1px solid var(--accent);
-  box-shadow: none;
-}
-.btn.ghost:hover {
-  background: var(--accent-soft);
-}
-
-/* ===== 程度测试按钮 ===== */
-.mapTest {
-  width: 100%;
-  max-width: none;
-  margin-bottom: 6px;
-}
-
-/* ===== 学习模式与跟唱 ===== */
-.learnCard {
+.heroCard {
+  border: 1px solid var(--kraft);
+  border-radius: 14px;
+  overflow: hidden;
   background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  padding: 28px 24px;
-  text-align: center;
+  box-shadow: 0 4px 18px rgba(34, 48, 74, 0.08);
 }
-.learnTag {
-  display: inline-block;
-  font-size: 13px;
-  letter-spacing: 2px;
-  color: var(--gold);
-  background: var(--gold-soft);
-  border-radius: 99px;
-  padding: 4px 14px;
-  margin-bottom: 14px;
-}
-.learnTitle {
-  font-family: var(--serif);
+.heroCard img { width: 100%; display: block; }
+
+.homeTitle {
+  font-family: 'SimSun', 'Songti SC', serif;
   font-size: 26px;
-  font-weight: 800;
-  letter-spacing: 2px;
-  margin-bottom: 10px;
+  margin: 22px 0 6px;
+  color: var(--slate);
 }
-.learnText {
-  color: var(--muted);
-  font-size: 15px;
-  line-height: 1.9;
-  margin-bottom: 16px;
-}
-.noteName {
-  font-family: var(--serif);
-  font-size: 44px;
-  font-weight: 800;
-  color: var(--accent);
-  margin: 10px 0 4px;
-}
-.stepList {
-  text-align: left;
-  max-width: 300px;
-  margin: 0 auto 18px;
-  font-size: 15px;
-  line-height: 2;
-}
-.learnNav {
-  display: flex;
-  gap: 12px;
-  justify-content: center;
-  margin-top: 18px;
-}
-.learnNav .btn {
-  width: auto;
-  margin: 0;
-  padding: 14px 28px;
-}
-.singBox {
-  text-align: center;
-  margin-top: 8px;
-}
-.micBtn {
+.homeSub { color: #6b7280; margin: 0 0 20px; }
+
+.homeBtns { display: flex; gap: 12px; flex-wrap: wrap; }
+
+.primaryBtn {
+  background: var(--slate);
+  color: #fff;
+  border: none;
+  border-radius: 10px;
   padding: 12px 26px;
   font-size: 16px;
-  font-weight: 700;
-  font-family: inherit;
-  color: #fff;
-  background: var(--accent);
-  border: none;
-  border-radius: 99px;
   cursor: pointer;
 }
-.micBtn:hover {
-  background: var(--accent-dark);
+.primaryBtn.big { width: 100%; margin-top: 22px; padding: 15px; font-size: 17px; }
+.primaryBtn:hover { background: #2c3947; }
+
+.ghostBtn {
+  background: transparent;
+  color: var(--slate);
+  border: 1px solid var(--kraft);
+  border-radius: 10px;
+  padding: 11px 20px;
+  font-size: 15px;
+  cursor: pointer;
 }
-.hearBox {
-  font-size: 16px;
-  background: var(--accent-soft);
-  border: 1px solid #c9d5de;
-  border-radius: 6px;
-  padding: 14px;
+.ghostBtn:hover { border-color: var(--gold); }
+
+.streakLine { color: var(--gold); margin-top: 16px; }
+
+.unitCard {
+  background: var(--card);
+  border: 1px solid var(--kraft);
+  border-radius: 14px;
+  padding: 16px 18px 20px;
+  margin-top: 18px;
 }
-.hearHint {
-  font-size: 13px;
-  color: var(--muted);
-  margin-top: 6px;
-}
-/* ===== 谱例卡与乐器（第三单元） ===== */
-.conceptStaffs {
-  display: flex;
-  gap: 10px;
-  justify-content: center;
-  flex-wrap: wrap;
-  margin: 12px 0;
-}
-.conceptLabel {
-  font-size: 13px;
-  color: var(--muted);
-  text-align: center;
-  margin: 2px 0 10px;
-}
-.rhythmBig {
-  font-size: 26px;
-  letter-spacing: 4px;
-  margin: 8px 0 16px;
-}
-.instCard {
-  display: flex;
-  gap: 16px;
-  align-items: center;
-  text-align: left;
-  background: var(--accent-soft);
-  border: 1px solid #c9d5de;
-  border-radius: 6px;
-  padding: 14px 16px;
-  margin: 0 auto 14px;
-  max-width: 400px;
-}
-.instImgBig {
-  width: 84px;
-  height: 84px;
-  object-fit: contain;
-  flex: none;
-}
-.instName {
-  font-family: var(--serif);
+.unitCard h2 {
+  font-family: 'SimSun', 'Songti SC', serif;
   font-size: 19px;
-  font-weight: 800;
-  letter-spacing: 2px;
-  margin-bottom: 4px;
+  color: var(--slate);
+  margin: 4px 0 14px;
 }
-.instDesc {
-  font-size: 13px;
-  color: var(--muted);
-  line-height: 1.8;
-}
-.opt.instOpt {
+
+.lvGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.lv {
   display: flex;
   align-items: center;
-  gap: 12px;
-  justify-content: flex-start;
+  gap: 8px;
+  background: var(--paper);
+  border: 1px solid var(--kraft);
+  border-radius: 10px;
+  padding: 10px 12px;
+  cursor: pointer;
+  text-align: left;
+  font-size: 14px;
+  color: var(--ink);
+}
+.lv:hover:not(.locked) { border-color: var(--gold); }
+.lv.locked { opacity: 0.42; cursor: not-allowed; }
+.lvNum {
+  min-width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--slate);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+}
+.lvTitle { line-height: 1.3; }
+
+.learnTitle {
+  font-family: 'SimSun', 'Songti SC', serif;
+  color: var(--slate);
+  margin: 18px 0 4px;
+}
+.learnGoal { color: #6b7280; margin: 0 0 14px; }
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--kraft);
+  border-radius: 12px;
+  padding: 14px 16px;
+  margin-bottom: 14px;
+}
+.card h3 {
+  font-family: 'SimSun', 'Songti SC', serif;
+  margin: 0 0 8px;
+  color: var(--slate);
+  font-size: 17px;
+}
+.card p { margin: 6px 0; line-height: 1.8; font-size: 15px; }
+.card ul { padding-left: 20px; line-height: 1.9; }
+
+.playBtn {
+  background: transparent;
+  border: 1px solid var(--gold);
+  color: var(--gold);
+  border-radius: 999px;
+  padding: 7px 16px;
+  margin: 6px 8px 0 0;
+  cursor: pointer;
+  font-size: 14px;
+}
+.playBtn:hover { background: rgba(185, 150, 47, 0.1); }
+
+.intRow { display: flex; gap: 14px; flex-wrap: wrap; }
+.intCard {
+  border: 1px dashed var(--kraft);
+  border-radius: 10px;
+  padding: 10px 14px;
+  min-width: 200px;
+}
+.intName { font-weight: 700; color: var(--slate); }
+.intDesc { color: #6b7280; font-size: 13px; margin-bottom: 4px; }
+
+.instGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
+.instCard { border: 1px dashed var(--kraft); border-radius: 10px; padding: 12px; }
+.instCard img { width: 100%; }
+.instName { font-weight: 700; color: var(--slate); margin-top: 6px; }
+
+.quizHead {
+  display: flex;
+  justify-content: space-between;
+  color: #6b7280;
+  font-size: 14px;
+  margin-bottom: 8px;
+}
+.kindTag {
+  border: 1px solid var(--gold);
+  color: var(--gold);
+  border-radius: 999px;
+  padding: 2px 12px;
+  font-size: 13px;
+}
+
+.qPrompt {
+  font-family: 'SimSun', 'Songti SC', serif;
+  font-size: 21px;
+  color: var(--slate);
+  margin: 10px 0 14px;
+}
+
+.optGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; }
+.optGrid.staffOpts, .optGrid.instOpts { grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); }
+
+.optBtn {
+  background: var(--card);
+  border: 1.5px solid var(--kraft);
+  border-radius: 12px;
+  padding: 14px;
+  font-size: 16px;
+  cursor: pointer;
+  color: var(--ink);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+.optBtn:hover { border-color: var(--gold); }
+.optBtn.right { border-color: var(--green); background: rgba(74, 125, 79, 0.1); }
+.optBtn.wrongPick { border-color: var(--red); background: rgba(178, 59, 46, 0.08); }
+.optBtn.dim { opacity: 0.45; }
+.optBtn .staff { pointer-events: none; }
+.optInst { width: 90px; }
+
+.fbRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 18px;
+  padding: 12px 14px;
+  background: var(--card);
+  border: 1px solid var(--kraft);
+  border-radius: 12px;
+}
+.fbOk { color: var(--green); font-weight: 700; }
+.fbNo { color: var(--red); font-weight: 700; }
+
+.sightWrap { display: flex; justify-content: center; margin: 10px 0; }
+.staff { display: inline-block; }
+
+.singPanel {
+  background: var(--card);
+  border: 1px solid var(--kraft);
+  border-radius: 12px;
+  padding: 18px;
+  margin-top: 14px;
+  text-align: center;
+}
+.singTarget { font-size: 18px; margin-bottom: 10px; }
+.singHeard { color: #6b7280; min-height: 24px; }
+.singCents { margin-left: 10px; font-size: 13px; }
+.singBar {
+  height: 10px;
+  background: var(--paper);
+  border-radius: 999px;
+  margin-top: 12px;
+  overflow: hidden;
+}
+.singBarFill { height: 100%; background: var(--gold); transition: width 0.15s; }
+.singGood { color: var(--green); margin-top: 10px; }
+.ghostMic {
+  margin-top: 14px;
+  background: transparent;
+  border: 1px dashed var(--kraft);
+  color: #6b7280;
+  border-radius: 10px;
   padding: 10px 18px;
+  cursor: pointer;
 }
-.opt.instOpt img {
-  width: 48px;
-  height: 48px;
-  object-fit: contain;
+
+.doneCard {
+  background: var(--card);
+  border: 1px solid var(--kraft);
+  border-radius: 14px;
+  padding: 30px 24px;
+  text-align: center;
+  margin-top: 24px;
 }
+.doneCard h2 { font-family: 'SimSun', 'Songti SC', serif; color: var(--slate); }
+.doneScore { font-size: 42px; color: var(--gold); margin: 10px 0; font-family: 'SimSun', serif; }
+.doneCard .homeBtns { justify-content: center; margin-top: 16px; }
+
+.intList { margin: 6px 0; }

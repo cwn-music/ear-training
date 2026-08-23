@@ -1,124 +1,146 @@
-import * as Tone from "tone";
-import type { RhythmToken } from "./lessons";
+// 缪斯 Muse · 音频引擎（Tone.js Sampler，懒加载真实乐器采样）
+import * as Tone from 'tone'
+import type { InstId, Tok } from './theory'
+import { TOK_BEATS } from './theory'
 
-const NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+let started = false
+let piano: Tone.Sampler | null = null
+const instSamplers: Partial<Record<InstId, Tone.Sampler>> = {}
 
-export function midiToNote(midi: number): string {
-  const name = NOTE_NAMES[midi % 12];
-  const octave = Math.floor(midi / 12) - 1;
-  return name + octave;
+const SALAMANDER = 'https://tonejs.github.io/audio/salamander/'
+const INST_BASE = 'https://nbrosowsky.github.io/tonejs-instruments/samples/'
+
+const PIANO_URLS: Record<string, string> = {
+  C3: 'C3.mp3', 'D#3': 'Ds3.mp3', 'F#3': 'Fs3.mp3', A3: 'A3.mp3',
+  C4: 'C4.mp3', 'D#4': 'Ds4.mp3', 'F#4': 'Fs4.mp3', A4: 'A4.mp3',
+  C5: 'C5.mp3', 'D#5': 'Ds5.mp3', 'F#5': 'Fs5.mp3', A5: 'A5.mp3',
 }
-
-let sampler: Tone.Sampler | null = null;
-
-export async function initAudio(): Promise<void> {
-  if (sampler) return;
-  await Tone.start();
-  sampler = new Tone.Sampler({
-    urls: {
-      A0: "A0.mp3", C1: "C1.mp3", "D#1": "Ds1.mp3", "F#1": "Fs1.mp3",
-      A1: "A1.mp3", C2: "C2.mp3", "D#2": "Ds2.mp3", "F#2": "Fs2.mp3",
-      A2: "A2.mp3", C3: "C3.mp3", "D#3": "Ds3.mp3", "F#3": "Fs3.mp3",
-      A3: "A3.mp3", C4: "C4.mp3", "D#4": "Ds4.mp3", "F#4": "Fs4.mp3",
-      A4: "A4.mp3", C5: "C5.mp3", "D#5": "Ds5.mp3", "F#5": "Fs5.mp3",
-      A5: "A5.mp3", C6: "C6.mp3", "D#6": "Ds6.mp3", "F#6": "Fs6.mp3",
-      A6: "A6.mp3", C7: "C7.mp3", "D#7": "Ds7.mp3", "F#7": "Fs7.mp3",
-      A7: "A7.mp3", C8: "C8.mp3",
-    },
-    release: 1,
-    baseUrl: "https://tonejs.github.io/audio/salamander/",
-  }).toDestination();
-  await Tone.loaded();
-}
-
-export function playNote(midi: number): void {
-  if (!sampler) return;
-  sampler.triggerAttackRelease(midiToNote(midi), 1.0);
-}
-
-// 先后响起（旋律音程）
-export function playInterval(midi1: number, midi2: number): void {
-  if (!sampler) return;
-  const now = Tone.now();
-  sampler.triggerAttackRelease(midiToNote(midi1), 1.0, now);
-  sampler.triggerAttackRelease(midiToNote(midi2), 1.0, now + 0.9);
-}
-
-// 同时响起（和声音程）
-export function playHarmonic(midi1: number, midi2: number): void {
-  if (!sampler) return;
-  sampler.triggerAttackRelease([midiToNote(midi1), midiToNote(midi2)], 1.4);
-}
-
-// 一串旋律
-export function playMelody(midis: number[], noteLen = 0.55): void {
-  if (!sampler) return;
-  const now = Tone.now();
-  midis.forEach((m, i) => {
-    sampler!.triggerAttackRelease(midiToNote(m), 0.5, now + i * noteLen);
-  });
-}
-
-// 节奏型（用固定音高敲出来）
-const RHYTHM_BEATS: Record<string, number> = {
-  q: 1, e: 0.5, ee: 1, eeee: 1, h: 2, "q.": 1.5, r: 1,
-};
-export function playRhythm(tokens: RhythmToken[]): void {
-  if (!sampler) return;
-  let t = Tone.now() + 0.05;
-  const beat = 0.8;
-  for (const tok of tokens) {
-    const dur = (RHYTHM_BEATS[tok] ?? 1) * beat;
-    if (tok === "ee") {
-      sampler.triggerAttackRelease("A4", 0.25, t);
-      sampler.triggerAttackRelease("A4", 0.25, t + dur / 2);
-    } else if (tok === "eeee") {
-      for (let i = 0; i < 4; i++) {
-        sampler.triggerAttackRelease("A4", 0.2, t + (i * dur) / 4);
-      }
-    } else if (tok !== "r") {
-      sampler.triggerAttackRelease("A4", Math.min(dur * 0.9, 1.4), t);
-    }
-    t += dur;
-  }
-}
-
-// ---------- 真实乐器采样（小提琴/长笛/小号） ----------
-const INST_BASE = "https://nbrosowsky.github.io/tonejs-instruments/samples/";
-const INST_URLS: Record<string, Record<string, string>> = {
+const INST_URLS: Record<Exclude<InstId, 'piano'>, { base: string; urls: Record<string, string> }> = {
   violin: {
-    G3: "G3.mp3", C4: "C4.mp3", E4: "E4.mp3", G4: "G4.mp3",
-    A4: "A4.mp3", C5: "C5.mp3", E5: "E5.mp3",
+    base: INST_BASE + 'violin/',
+    urls: { G3: 'G3.mp3', C4: 'C4.mp3', E4: 'E4.mp3', G4: 'G4.mp3', A4: 'A4.mp3', C5: 'C5.mp3', E5: 'E5.mp3' },
   },
   flute: {
-    C4: "C4.mp3", E4: "E4.mp3", A4: "A4.mp3", C5: "C5.mp3", E5: "E5.mp3",
+    base: INST_BASE + 'flute/',
+    urls: { C4: 'C4.mp3', E4: 'E4.mp3', A4: 'A4.mp3', C5: 'C5.mp3', E5: 'E5.mp3', A5: 'A5.mp3', C6: 'C6.mp3' },
   },
   trumpet: {
-    C4: "C4.mp3", "D#4": "Ds4.mp3", F4: "F4.mp3", G4: "G4.mp3",
-    "A#4": "As4.mp3", D5: "D5.mp3",
+    base: INST_BASE + 'trumpet/',
+    urls: { F3: 'F3.mp3', A3: 'A3.mp3', C4: 'C4.mp3', 'D#4': 'Ds4.mp3', F4: 'F4.mp3', G4: 'G4.mp3', 'A#4': 'As4.mp3', D5: 'D5.mp3', F5: 'F5.mp3', A5: 'A5.mp3', C6: 'C6.mp3' },
   },
-};
-const instSamplers: Record<string, Tone.Sampler> = {};
-
-export async function initInstruments(ids: string[]): Promise<void> {
-  const pending = ids.filter((id) => id !== "piano" && INST_URLS[id] && !instSamplers[id]);
-  if (pending.length === 0) return;
-  await Tone.start();
-  for (const id of pending) {
-    instSamplers[id] = new Tone.Sampler({
-      urls: INST_URLS[id],
-      baseUrl: INST_BASE + id + "/",
-    }).toDestination();
-  }
-  await Tone.loaded();
 }
 
-// 用指定乐器演奏一串旋律
-export function playInstrumentMelody(id: string, midis: number[], noteLen = 0.5): void {
-  const s = id === "piano" ? sampler : instSamplers[id];
-  if (!s) return;
-  const now = Tone.now();
-  midis.forEach((m, i) => {
-    s.triggerAttackRelease(midiToNote(m), 0.45, now + i * noteLen);
-  });
+const noteName = (midi: number) => Tone.Frequency(midi, 'midi').toNote()
+
+function safeTrigger(s: Tone.Sampler, note: string | string[], dur: number, t: number, vel: number) {
+  try {
+    s.triggerAttackRelease(note, dur, t, vel)
+  } catch {
+    // 采样未加载完时跳过，不影响做题流程
+  }
+}
+
+export async function ensureAudio() {
+  if (!started) {
+    await Tone.start()
+    started = true
+    piano = new Tone.Sampler({ urls: PIANO_URLS, baseUrl: SALAMANDER }).toDestination()
+  }
+  // 等采样加载好再播放（最多等 5 秒，超时也照播）
+  await Promise.race([Tone.loaded(), new Promise(r => setTimeout(r, 5000))])
+}
+
+// 懒加载乐器采样（音色题用）
+export async function initInstruments() {
+  await ensureAudio()
+  for (const id of ['violin', 'flute', 'trumpet'] as const) {
+    if (!instSamplers[id]) {
+      instSamplers[id] = new Tone.Sampler({ urls: INST_URLS[id].urls, baseUrl: INST_URLS[id].base }).toDestination()
+    }
+  }
+  await Promise.race([Tone.loaded(), new Promise(r => setTimeout(r, 5000))])
+}
+
+export function playNote(midi: number, dur = 0.85, vel = 0.9) {
+  const p = piano
+  if (!p) return
+  safeTrigger(p, noteName(midi), dur, Tone.now(), vel)
+}
+
+export function playMelody(notes: number[], gap = 0.45, dur = 0.85, vels?: number[]) {
+  const p = piano
+  if (!p) return
+  const t0 = Tone.now() + 0.05
+  notes.forEach((m, i) => {
+    safeTrigger(p, noteName(m), dur, t0 + i * (dur + gap), vels ? vels[i] : 0.9)
+  })
+}
+
+export function playHarmonic(a: number, b: number, dur = 1.4) {
+  const p = piano
+  if (!p) return
+  const t = Tone.now()
+  safeTrigger(p, [noteName(a), noteName(b)], dur, t, 0.9)
+}
+
+// 两个音依次播放：可分别控制时长与力度（长短/强弱/高低比较题用）
+export function playTwo(a: number, b: number, opt?: { da?: number; db?: number; va?: number; vb?: number; gap?: number }) {
+  const p = piano
+  if (!p) return
+  const da = opt?.da ?? 0.85
+  const db = opt?.db ?? 0.85
+  const gap = opt?.gap ?? 0.5
+  const t0 = Tone.now() + 0.05
+  safeTrigger(p, noteName(a), da, t0, opt?.va ?? 0.9)
+  safeTrigger(p, noteName(b), db, t0 + da + gap, opt?.vb ?? 0.9)
+}
+
+// 节奏播放：accentBeats 表示每几拍一个重音（拍号题用）
+export function playRhythm(tokens: Tok[], bpm = 72, accentBeats?: number) {
+  const p = piano
+  if (!p) return
+  const beatSec = 60 / bpm
+  const t0 = Tone.now() + 0.05
+  let pos = 0
+  let t = t0
+  for (const tok of tokens) {
+    const beats = TOK_BEATS[tok]
+    if (tok === 'r') {
+      pos += beats
+      t += beats * beatSec
+      continue
+    }
+    const parts = tok === 'ee' ? 2 : tok === 'eeee' ? 4 : 1
+    const each = (beats * beatSec) / parts
+    for (let i = 0; i < parts; i++) {
+      const posHere = pos + (i * beats) / parts
+      const isAccent = accentBeats !== undefined && Math.abs(posHere % accentBeats) < 1e-6
+      safeTrigger(p, 'C4', Math.max(0.18, each * 0.9), t + i * each, isAccent ? 1 : 0.55)
+    }
+    pos += beats
+    t += beats * beatSec
+  }
+}
+
+export function rhythmBeats(tokens: Tok[]) {
+  return tokens.reduce((s, t) => s + TOK_BEATS[t], 0)
+}
+
+export function playScaleNotes(root: number, steps: number[]) {
+  playMelody(steps.map(s => root + s), 0.28, 0.55)
+}
+
+export function playInstrument(inst: InstId, midi: number, dur = 0.9) {
+  const s = instSamplers[inst] ?? piano
+  if (!s) return
+  safeTrigger(s, noteName(midi), dur, Tone.now(), 0.9)
+}
+
+export function playInstrumentMelody(inst: InstId, notes: number[], gap = 0.4, dur = 0.8) {
+  const s = instSamplers[inst] ?? piano
+  if (!s) return
+  const t0 = Tone.now() + 0.05
+  notes.forEach((m, i) => {
+    safeTrigger(s, noteName(m), dur, t0 + i * (dur + gap), 0.9)
+  })
 }

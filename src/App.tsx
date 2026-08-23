@@ -1,422 +1,565 @@
-import { useState } from "react";
-import {
-  initAudio,
-  initInstruments,
-  playInterval,
-  playNote,
-  playHarmonic,
-  playMelody,
-  playRhythm,
-  playInstrumentMelody,
-} from "./audio";
-import { LEVELS, UNITS, INSTRUMENTS, type Level } from "./lessons";
-import {
-  generateSession,
-  generatePlacement,
-  type AnyQuestion,
-} from "./theory";
-import Staff from "./Staff";
-import MelodyStaff from "./MelodyStaff";
-import Learn from "./Learn";
-import SingTask from "./Sing";
-import "./App.css";
+// 缪斯 Muse · 主程序
+import { useCallback, useEffect, useState } from 'react'
+import type { ReactNode } from 'react'
+import './App.css'
+import Staff from './Staff'
+import Sing from './Sing'
+import { renderBody } from './Learn'
+import { LESSONS, UNITS, lessonOf, INSTRUMENTS } from './lessons'
+import type { DirectAns, Kind, Question } from './theory'
+import { INTERVAL_NAMES, SCALE_STEPS, makeQuestion, makeSightQuestion, nameOf, solfegeOf } from './theory'
+import { ensureAudio, initInstruments, playInstrumentMelody, playMelody, playNote, playRhythm, playScaleNotes, playTwo } from './audio'
 
-interface Progress {
-  unlocked: number;
-  best: Record<number, number>;
-}
+type Phase = 'home' | 'map' | 'learn' | 'playing' | 'done' | 'placementDone'
 
-function loadProgress(): Progress {
+const QUIZ_COUNT = 8
+const PASS_SCORE = 6
+const PLACEMENT_LEVELS = [1, 5, 9, 14]
+const PLACEMENT_TARGETS = [0, 4, 8, 13, 16]
+
+// —— 本地存储 ——
+const loadNum = (k: string, d: number) => {
   try {
-    const raw = localStorage.getItem("progress");
-    if (raw) return JSON.parse(raw);
+    const v = localStorage.getItem(k)
+    return v === null ? d : Number(v)
   } catch {
-    /* 忽略损坏的数据 */
+    return d
   }
-  return { unlocked: 0, best: {} };
 }
-
-function loadWrongStats(): Record<string, number> {
+const saveNum = (k: string, v: number) => {
   try {
-    const raw = localStorage.getItem("wrongStats");
-    if (raw) return JSON.parse(raw);
+    localStorage.setItem(k, String(v))
   } catch {
-    /* 忽略损坏的数据 */
+    /* 忽略 */
   }
-  return {};
 }
 
-function todayStr(): string {
-  return new Date().toISOString().slice(0, 10);
+interface Streak {
+  last: string
+  count: number
 }
-
-function updateStreak(): number {
-  const today = todayStr();
-  const last = localStorage.getItem("lastDate");
-  let streak = Number(localStorage.getItem("streak") ?? "0");
-  if (last === today) return streak;
-  const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
-  streak = last === yesterday ? streak + 1 : 1;
-  localStorage.setItem("lastDate", today);
-  localStorage.setItem("streak", String(streak));
-  return streak;
-}
-
-function suggestLevel(score: number, total: number): { tier: string; startId: number } {
-  const pct = score / total;
-  if (pct <= 0.33) return { tier: "零基础", startId: 0 };
-  if (pct <= 0.58) return { tier: "有一点基础", startId: 3 };
-  if (pct <= 0.83) return { tier: "较多基础", startId: 6 };
-  return { tier: "专业水平", startId: 10 };
-}
-
-function qTitle(q: AnyQuestion): string {
-  switch (q.kind) {
-    case "note":
-      return "这个音唱什么？";
-    case "interval":
-      return q.harmonic
-        ? "同时响起的两个音是什么音程？"
-        : "先后响起的两个音是什么音程？";
-    case "pitch":
-      return "第二个音比第一个音……";
-    case "stepleap":
-      return "这两个音是「级进」还是「跳进」？";
-    case "melody":
-      return "空缺（休止符）的位置是哪个音？";
-    case "rhythm":
-      return "你听到的是哪一条节奏？";
-    case "scale":
-      return "这条音阶是大调还是小调？";
-    case "timbre":
-      return "这段旋律是哪种乐器演奏的？";
-    case "sing":
-      return "先听范唱，再唱出这个音";
+const loadStreak = (): Streak => {
+  try {
+    const v = localStorage.getItem('muse-streak-v1')
+    return v ? (JSON.parse(v) as Streak) : { last: '', count: 0 }
+  } catch {
+    return { last: '', count: 0 }
   }
+}
+const loadWrong = (): Record<string, number> => {
+  try {
+    const v = localStorage.getItem('muse-wrong-v1')
+    return v ? (JSON.parse(v) as Record<string, number>) : {}
+  } catch {
+    return {}
+  }
+}
+
+function todayKey(d = new Date()) {
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${d.getFullYear()}-${m}-${day}`
+}
+
+const KIND_LABEL: Record<Kind, string> = {
+  pitch: '识音', stepleap: '级进跳进', interval: '音程', melody: '旋律', rhythm: '节奏',
+  scale: '音阶', timbre: '音色', sight: '视唱',
+  pitchcmp: '高低比较', durcmp: '长短比较', dyncmp: '强弱比较', direct: '旋律走向', meter: '拍号',
 }
 
 export default function App() {
-  const [phase, setPhase] = useState<
-    "map" | "learn" | "playing" | "done" | "placementDone"
-  >("map");
-  const [progress, setProgress] = useState<Progress>(loadProgress);
-  const [streak, setStreak] = useState(() =>
-    Number(localStorage.getItem("streak") ?? "0")
-  );
-  const [level, setLevel] = useState<Level>(LEVELS[0]);
-  const [questions, setQuestions] = useState<AnyQuestion[]>([]);
-  const [isPlacement, setIsPlacement] = useState(false);
-  const [index, setIndex] = useState(0);
-  const [score, setScore] = useState(0);
-  const [picked, setPicked] = useState<string | null>(null);
-  const [lastPct, setLastPct] = useState(0);
-  const [placementScore, setPlacementScore] = useState(0);
+  const [phase, setPhase] = useState<Phase>('home')
+  const [unlocked, setUnlocked] = useState(() => Math.max(1, loadNum('muse-progress-v1', 1)))
+  const [streak, setStreak] = useState<Streak>(loadStreak)
+  const [wrong, setWrong] = useState<Record<string, number>>(loadWrong)
+  const [level, setLevel] = useState(1)
 
-  async function openLevel(lv: Level) {
-    await initAudio();
-    if (lv.ear === "timbre") await initInstruments(lv.instruments ?? []);
-    setLevel(lv);
-    setIsPlacement(false);
-    setPhase("learn");
-  }
+  // 答题流程
+  const [quiz, setQuiz] = useState<Question[]>([])
+  const [idx, setIdx] = useState(0)
+  const [score, setScore] = useState(0)
+  const [picked, setPicked] = useState<string | null>(null)
+  const [singing, setSinging] = useState(false)
 
-  function beginQuiz() {
-    setStreak(updateStreak());
-    startRound(generateSession(level, loadWrongStats()), false);
-  }
+  // 定级测试
+  const [plGate, setPlGate] = useState(-1)
+  const [plPassed, setPlPassed] = useState(0)
+  const [placing, setPlacing] = useState(false)
 
-  async function startPlacement() {
-    await initAudio();
-    startRound(generatePlacement(loadWrongStats()), true);
-  }
+  const q = quiz[idx]
 
-  function startRound(qs: AnyQuestion[], placement: boolean) {
-    setQuestions(qs);
-    setIsPlacement(placement);
-    setIndex(0);
-    setScore(0);
-    setPicked(null);
-    setPhase("playing");
-    autoplay(qs[0]);
-  }
-
-  function autoplay(q: AnyQuestion) {
-    switch (q.kind) {
-      case "interval":
-        if (q.harmonic) playHarmonic(q.midi1, q.midi2);
-        else playInterval(q.midi1, q.midi2);
-        break;
-      case "pitch":
-      case "stepleap":
-        playInterval(q.midi1, q.midi2);
-        break;
-      case "melody":
-        playMelody(q.notes);
-        break;
-      case "rhythm":
-        playRhythm(q.tokens);
-        break;
-      case "scale":
-        playMelody(q.midis, 0.45);
-        break;
-      case "timbre":
-        playInstrumentMelody(q.instrument, q.midis);
-        break;
-      default:
-        playNote(q.midi);
-    }
-  }
-
-  function recordWrong(q: AnyQuestion) {
-    const stats = loadWrongStats();
-    stats[q.wrongKey] = (stats[q.wrongKey] ?? 0) + 1;
-    localStorage.setItem("wrongStats", JSON.stringify(stats));
-  }
-
-  function finish(correct: boolean, q: AnyQuestion, delay = 1200) {
-    if (!correct) recordWrong(q);
-    const finalScore = score + (correct ? 1 : 0);
-    if (correct) setScore(finalScore);
-    setTimeout(() => {
-      const ni = index + 1;
-      if (ni >= questions.length) {
-        if (isPlacement) {
-          setPlacementScore(finalScore);
-          setPhase("placementDone");
-          return;
-        }
-        const pct = Math.round((finalScore / questions.length) * 100);
-        setLastPct(pct);
-        const p: Progress = {
-          unlocked: progress.unlocked,
-          best: { ...progress.best },
-        };
-        p.best[level.id] = Math.max(p.best[level.id] ?? 0, pct);
-        if (pct >= 80 && level.id === p.unlocked && p.unlocked < LEVELS.length - 1) {
-          p.unlocked += 1;
-        }
-        setProgress(p);
-        localStorage.setItem("progress", JSON.stringify(p));
-        setPhase("done");
-      } else {
-        setIndex(ni);
-        setPicked(null);
-        autoplay(questions[ni]);
+  const recordWrong = useCallback((kind: Kind, correct: boolean) => {
+    setWrong(w => {
+      const next = { ...w }
+      next[kind] = (next[kind] ?? 0) + (correct ? -1 : 2)
+      if (next[kind] <= 0) delete next[kind]
+      try {
+        localStorage.setItem('muse-wrong-v1', JSON.stringify(next))
+      } catch {
+        /* 忽略 */
       }
-    }, delay);
-  }
+      return next
+    })
+  }, [])
 
-  function answer(opt: string) {
-    if (picked) return;
-    setPicked(opt);
-    const q = questions[index];
-    finish(opt === q.answer, q);
-  }
+  const playQuestion = useCallback((question: Question) => {
+    void ensureAudio().then(() => {
+      switch (question.kind) {
+        case 'pitch':
+          playNote(question.midi)
+          break
+        case 'stepleap':
+          playTwo(question.a, question.b, { gap: 0.5 })
+          break
+        case 'interval':
+          playTwo(question.a, question.b, { gap: 0.45 })
+          break
+        case 'melody':
+          playMelody(question.notes, 0.4)
+          break
+        case 'rhythm':
+          playRhythm(question.tokens)
+          break
+        case 'scale':
+          playScaleNotes(question.root, SCALE_STEPS[question.mode])
+          break
+        case 'timbre':
+          void initInstruments().then(() => playInstrumentMelody(question.inst, question.notes))
+          break
+        case 'pitchcmp':
+          playTwo(question.a, question.b)
+          break
+        case 'durcmp':
+          playTwo(question.midi, question.midi, { da: question.da, db: question.db })
+          break
+        case 'dyncmp':
+          playTwo(question.midi, question.midi, { va: question.va, vb: question.vb })
+          break
+        case 'direct':
+          playMelody(question.notes, 0.32)
+          break
+        case 'meter':
+          playRhythm(question.tokens, 72, question.beats)
+          break
+        case 'sight':
+          break
+      }
+    })
+  }, [])
 
-  function applySuggestion(startId: number) {
-    const p: Progress = { unlocked: startId, best: {} };
-    for (const lv of LEVELS) {
-      if (lv.id < startId) p.best[lv.id] = 100;
+  // 换题自动播放
+  useEffect(() => {
+    if (phase === 'playing' && q) {
+      const t = window.setTimeout(() => playQuestion(q), 350)
+      return () => window.clearTimeout(t)
     }
-    setProgress(p);
-    localStorage.setItem("progress", JSON.stringify(p));
-    setPhase("map");
+  }, [phase, idx, q, playQuestion])
+
+  const topWrongKeys = () =>
+    Object.entries(wrong)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 12)
+      .map(([k]) => k)
+
+  function startQuiz(lv: number, placement = false) {
+    setLevel(lv)
+    const qs: Question[] = []
+    if (placement) {
+      // 定级：每关 3 题（2 听 + 1 识音）
+      for (let i = 0; i < 2; i++) {
+        let x = makeQuestion(lv)
+        let guard = 0
+        while (x.kind === 'sight' && guard++ < 10) x = makeQuestion(lv)
+        qs.push(x)
+      }
+      qs.push(makeSightQuestion(lv))
+    } else {
+      const boost = topWrongKeys()
+      for (let i = 0; i < QUIZ_COUNT; i++) qs.push(makeQuestion(lv, boost))
+    }
+    setQuiz(qs)
+    setIdx(0)
+    setScore(0)
+    setPicked(null)
+    setSinging(false)
+    setPhase('playing')
   }
 
-  const levelName = (lv: Level) =>
-    lv.id === 0 ? "入门课" : `第 ${lv.id} 课`;
+  function startPlacement() {
+    setPlPassed(0)
+    setPlGate(0)
+    startQuiz(PLACEMENT_LEVELS[0], true)
+  }
 
-  // ---------- 课程地图 ----------
-  if (phase === "map") {
-    let lastUnit = 0;
+  // 答案键：统一成字符串比较
+  function answerKeyOf(question: Question): string {
+    switch (question.kind) {
+      case 'pitch':
+        return String(question.midi)
+      case 'stepleap':
+        return question.answer
+      case 'interval':
+        return String(question.semis)
+      case 'melody':
+        return question.notes.join(',')
+      case 'rhythm':
+        return question.tokens.join(',')
+      case 'scale':
+        return question.mode
+      case 'timbre':
+        return question.inst
+      case 'sight':
+        return String(question.midi)
+      case 'pitchcmp':
+        return question.answer
+      case 'durcmp':
+        return question.answer
+      case 'dyncmp':
+        return question.answer
+      case 'direct':
+        return question.answer
+      case 'meter':
+        return String(question.beats)
+    }
+  }
+
+  function pick_(key: string) {
+    if (picked || !q) return
+    setPicked(key)
+    const correct = key === answerKeyOf(q)
+    recordWrong(q.kind, correct)
+    if (correct) {
+      if (q.kind === 'sight') {
+        setSinging(true) // 识音答对 → 跟唱
+      } else {
+        setScore(s => s + 1)
+      }
+    }
+  }
+
+  function nextQuestion() {
+    setPicked(null)
+    setSinging(false)
+    if (idx + 1 < quiz.length) {
+      setIdx(i => i + 1)
+    } else {
+      finishRound()
+    }
+  }
+
+  function finishRound() {
+    if (placing) {
+      if (score >= 2) {
+        const passed = plGate + 1
+        setPlPassed(passed)
+        if (passed < PLACEMENT_LEVELS.length) {
+          setPlGate(passed)
+          startQuiz(PLACEMENT_LEVELS[passed], true)
+          return
+        }
+      }
+      finishPlacement()
+    } else {
+      if (score >= PASS_SCORE && level === unlocked && level < LESSONS.length) {
+        const nu = level + 1
+        setUnlocked(nu)
+        saveNum('muse-progress-v1', nu)
+      }
+      bumpStreak()
+      setPhase('done')
+    }
+  }
+
+  function finishPlacement() {
+    const target = PLACEMENT_TARGETS[plPassed] ?? 0
+    if (target >= 1) {
+      setUnlocked(target)
+      saveNum('muse-progress-v1', target)
+    }
+    setPlacing(false)
+    setPlGate(-1)
+    setPhase('placementDone')
+  }
+
+  function bumpStreak() {
+    const today = todayKey()
+    if (streak.last === today) return
+    const yest = todayKey(new Date(Date.now() - 86400000))
+    const next: Streak = { last: today, count: streak.last === yest ? streak.count + 1 : 1 }
+    setStreak(next)
+    try {
+      localStorage.setItem('muse-streak-v1', JSON.stringify(next))
+    } catch {
+      /* 忽略 */
+    }
+  }
+
+  function openLesson(lv: number) {
+    setLevel(lv)
+    setPhase('learn')
+  }
+
+  // —— 选项构建 ——
+  interface Opt {
+    key: string
+    label: string
+    node?: ReactNode
+  }
+  function optionsOf(question: Question): Opt[] {
+    switch (question.kind) {
+      case 'pitch':
+        return question.options.map(m => ({ key: String(m), label: `${nameOf(m)}（${solfegeOf(m)}）` }))
+      case 'stepleap':
+        return [
+          { key: 'step', label: '级进（挨着走）' },
+          { key: 'leap', label: '跳进（跨着走）' },
+        ]
+      case 'interval':
+        return question.options.map(s => ({ key: String(s), label: INTERVAL_NAMES[s] }))
+      case 'melody':
+        return question.options.map((ns, i) => ({
+          key: ns.join(','),
+          label: `旋律 ${'ABC'[i]}`,
+          node: <Staff midi={null} midis={ns} width={210} height={100} />,
+        }))
+      case 'rhythm':
+        return question.options.map((ts, i) => ({
+          key: ts.join(','),
+          label: `节奏 ${'ABC'[i]}`,
+          node: <Staff rhythm={ts} width={210} height={100} />,
+        }))
+      case 'scale':
+        return [
+          { key: 'major', label: '大调' },
+          { key: 'minor', label: '小调' },
+        ]
+      case 'timbre':
+        return INSTRUMENTS.map(inst => ({
+          key: inst.id,
+          label: inst.name,
+          node: <img className="optInst" src={inst.img} alt={inst.name} />,
+        }))
+      case 'sight':
+        return question.options.map(m => ({ key: String(m), label: `${nameOf(m)}（${solfegeOf(m)}）` }))
+      case 'pitchcmp':
+        return [
+          { key: 'up', label: '更高' },
+          { key: 'down', label: '更低' },
+          { key: 'same', label: '一样高' },
+        ]
+      case 'durcmp':
+        return [
+          { key: 'longer', label: '更长' },
+          { key: 'shorter', label: '更短' },
+          { key: 'same', label: '一样长' },
+        ]
+      case 'dyncmp':
+        return [
+          { key: 'louder', label: '更响' },
+          { key: 'softer', label: '更轻' },
+          { key: 'same', label: '一样响' },
+        ]
+      case 'direct': {
+        const labels: Record<DirectAns, string> = { up: '上行', down: '下行', repeat: '同音反复', wave: '波浪（先上后下）' }
+        return question.options.map(a => ({ key: a, label: labels[a] }))
+      }
+      case 'meter':
+        return [
+          { key: '2', label: '二拍子（强 · 弱）' },
+          { key: '3', label: '三拍子（强 · 弱 · 弱）' },
+        ]
+    }
+  }
+
+  function promptOf(question: Question): string {
+    switch (question.kind) {
+      case 'pitch': return '听一听，这个音是？'
+      case 'stepleap': return '先后两个音：它们是级进还是跳进？'
+      case 'interval': return '先后两个音：这个音程是？'
+      case 'melody': return '你听到的是哪一条旋律？'
+      case 'rhythm': return '你听到的是哪一条节奏？'
+      case 'scale': return '这条音阶是大调还是小调？'
+      case 'timbre': return '这是哪种乐器在演奏？'
+      case 'sight': return '这个音是？认出它，再唱出来'
+      case 'pitchcmp': return '听先后两个音：第二个音比第一个音……'
+      case 'durcmp': return '先后两个音高相同：第二个音比第一个音……'
+      case 'dyncmp': return '先后两个音高相同：第二个音比第一个音……'
+      case 'direct': return '这段旋律的走向是……'
+      case 'meter': return '听重音：这段节奏是几拍子？'
+    }
+  }
+
+  const answerKey = q ? answerKeyOf(q) : ''
+  const opts = q ? optionsOf(q) : []
+
+  // —— 界面 ——
+  if (phase === 'home') {
     return (
       <div className="page">
-        <header className="brand">
-          <img src="/muse.png" alt="缪斯徽章" className="brandImg" />
-          <div className="logo">缪斯</div>
-          <div className="logoSub">MVSE · 视唱练耳</div>
-          <div className="meander" />
-          <div className="streak">🔥 连续练习 {streak} 天</div>
-        </header>
-        <p className="hint">先学新知识，再闯关：每课 10 题，≥80% 解锁下一课</p>
-        <button className="btn ghost mapTest" onClick={startPlacement}>
-          📋 不知道自己的水平？先做个 3 分钟程度测试
-        </button>
-        <div className="levelList">
-          {LEVELS.map((lv) => {
-            const locked = lv.id > progress.unlocked;
-            const best = progress.best[lv.id];
-            const passed = (best ?? 0) >= 80;
-            const current = lv.id === progress.unlocked && !passed;
-            const showUnit = lv.unit !== lastUnit;
-            lastUnit = lv.unit;
-            return (
-              <div key={lv.id}>
-                {showUnit && (
-                  <div className="unitHeader">
-                    <span className="unitLine" />
-                    <span className="unitName">{UNITS[lv.unit]}</span>
-                    <span className="unitLine" />
-                  </div>
-                )}
-                <button
-                  className={
-                    "levelCard" +
-                    (locked ? " locked" : "") +
-                    (passed ? " passed" : "") +
-                    (current ? " current" : "")
-                  }
-                  disabled={locked}
-                  onClick={() => openLevel(lv)}
-                >
-                  <span className="lvBadge">
-                    {locked ? "🔒" : passed ? "✓" : lv.id === 0 ? "★" : lv.id}
-                  </span>
-                  <span className="lvText">
-                    <span className="lvTitle">
-                      {levelName(lv)} · {lv.title}
-                      {lv.review ? " ★" : ""}
-                    </span>
-                    <span className="lvDesc">{lv.desc}</span>
-                  </span>
-                  {best !== undefined && !locked && (
-                    <span className="lvBest">{best}%</span>
-                  )}
-                </button>
-              </div>
-            );
-          })}
+        <header className="brand">缪斯 Muse</header>
+        <div className="heroCard">
+          <img src="/hero.png" alt="缪斯" />
         </div>
-        <p className="hint small">做错的内容会自动多出现 · 带 ★ 的是复习课</p>
-      </div>
-    );
-  }
-
-  // ---------- 学习模式 ----------
-  if (phase === "learn") {
-    return (
-      <Learn level={level} onStart={beginQuiz} onBack={() => setPhase("map")} />
-    );
-  }
-
-  // ---------- 结算页 ----------
-  if (phase === "done") {
-    const passed = lastPct >= 80;
-    return (
-      <div className="page center">
-        <div className="doneEmoji">{passed ? "🎉" : "💪"}</div>
-        <h1 className="big">{lastPct}%</h1>
-        <p className="meta">
-          {passed
-            ? level.id === LEVELS.length - 1
-              ? "恭喜！你完成了全部课程！"
-              : "达标！下一课已解锁"
-            : "差一点点，再练一组就能解锁"}
-        </p>
-        <button className="btn" onClick={beginQuiz}>
-          再来一组
-        </button>
-        <button className="btn ghost" onClick={() => setPhase("map")}>
-          返回课程
-        </button>
-      </div>
-    );
-  }
-
-  // ---------- 程度测试结果 ----------
-  if (phase === "placementDone") {
-    const s = suggestLevel(placementScore, questions.length);
-    const startName = s.startId === 0 ? "入门课" : `第 ${s.startId} 课`;
-    return (
-      <div className="page center">
-        <div className="doneEmoji">📋</div>
-        <h1 className="big" style={{ fontSize: 40 }}>
-          {s.tier}
-        </h1>
-        <p className="meta">
-          测试成绩 {placementScore}/{questions.length}
-          <br />
-          建议从「{startName}」开始学习，之前的课程将标记为已通过。
-        </p>
-        <button className="btn" onClick={() => applySuggestion(s.startId)}>
-          从{startName}开始
-        </button>
-        <button className="btn ghost" onClick={() => applySuggestion(0)}>
-          从头开始
-        </button>
-        <button className="btn ghost" onClick={() => setPhase("map")}>
-          先看看课程列表
-        </button>
-      </div>
-    );
-  }
-
-  // ---------- 练习页 ----------
-  const q = questions[index];
-  return (
-    <div className="page">
-      <div className="sessionTop">
-        <button className="closeBtn" onClick={() => setPhase("map")}>
-          ✕
-        </button>
-        <div className="track">
-          <div
-            className="fill"
-            style={{ width: `${(index / questions.length) * 100}%` }}
-          />
+        <h1 className="homeTitle">每天一刻钟，练出音乐耳</h1>
+        <p className="homeSub">听音 · 节奏 · 视唱，从声音的礼物开始</p>
+        <div className="homeBtns">
+          <button className="primaryBtn" onClick={() => setPhase('map')}>开始学习</button>
+          <button className="ghostBtn" onClick={() => { setPlacing(true); setPlGate(0); startPlacement() }}>定级测试</button>
         </div>
-        <span className="counter">
-          {index + 1}/{questions.length}
-        </span>
+        {streak.count > 0 && <p className="streakLine">已连续练习 {streak.count} 天</p>}
       </div>
+    )
+  }
 
-      {q.kind === "sing" ? (
-        <>
-          <p className="qTitle">{qTitle(q)}</p>
-          <Staff midi={q.midi} clef={q.clef} />
-          <button className="replay" onClick={() => autoplay(q)}>
-            🔊 听范唱
-          </button>
-          <SingTask key={index} midi={q.midi} onDone={(ok) => finish(ok, q, 100)} />
-        </>
-      ) : (
-        <>
-          <p className="qTitle">{qTitle(q)}</p>
-          {q.kind === "note" && <Staff midi={q.midi} clef={q.clef} />}
-          {q.kind === "melody" && (
-            <MelodyStaff notes={q.notes} gapIndex={q.gapIndex} clef={q.clef} />
-          )}
-          <button className="replay" onClick={() => autoplay(q)}>
-            {q.kind === "note" ? "🔊 听一听" : "🔊 再听一遍"}
-          </button>
-          <div className={"options" + (q.kind === "rhythm" ? " oneCol" : "")}>
-            {q.options.map((opt) => {
-              let cls = "opt";
-              if (q.kind === "rhythm") cls += " rhythmOpt";
-              const inst =
-                q.kind === "timbre"
-                  ? INSTRUMENTS.find((x) => x.name === opt)
-                  : undefined;
-              if (inst) cls += " instOpt";
-              if (picked) {
-                if (opt === q.answer) cls += " correct";
-                else if (opt === picked) cls += " wrong";
-              }
+  if (phase === 'map') {
+    return (
+      <div className="page">
+        <header className="brand">缪斯 Muse</header>
+        <button className="ghostBtn" onClick={() => setPhase('home')}>← 首页</button>
+        {UNITS.map(u => (
+          <section className="unitCard" key={u.id}>
+            <h2>{u.name}</h2>
+            <div className="lvGrid">
+              {LESSONS.filter(l => l.unit === u.id).map(l => {
+                const locked = l.id > unlocked
+                return (
+                  <button key={l.id} className={'lv' + (locked ? ' locked' : '')} disabled={locked} onClick={() => openLesson(l.id)}>
+                    <span className="lvNum">{l.id}</span>
+                    <span className="lvTitle">{l.title}</span>
+                  </button>
+                )
+              })}
+            </div>
+          </section>
+        ))}
+      </div>
+    )
+  }
+
+  if (phase === 'learn') {
+    const ls = lessonOf(level)
+    return (
+      <div className="page">
+        <header className="brand">缪斯 Muse</header>
+        <button className="ghostBtn" onClick={() => setPhase('map')}>← 课程地图</button>
+        <h2 className="learnTitle">第 {ls.id} 课 · {ls.title}</h2>
+        <p className="learnGoal">{ls.goal}</p>
+        {renderBody(ls.id)}
+        <button
+          className="primaryBtn big"
+          onClick={() => {
+            setPlacing(false)
+            setPlGate(-1)
+            startQuiz(level)
+          }}
+        >
+          开始练习（{QUIZ_COUNT} 题）
+        </button>
+      </div>
+    )
+  }
+
+  if (phase === 'playing' && q) {
+    return (
+      <div className="page">
+        <header className="brand">缪斯 Muse</header>
+        <div className="quizHead">
+          <span>{placing ? `定级 · 第 ${plGate + 1} 关` : `第 ${level} 课`} · 第 {idx + 1}/{quiz.length} 题</span>
+          <span className="kindTag">{KIND_LABEL[q.kind]}</span>
+        </div>
+        <h2 className="qPrompt">{promptOf(q)}</h2>
+        {q.kind === 'sight' && (
+          <div className="sightWrap">
+            <Staff clef={q.clef} midi={q.midi} width={240} />
+          </div>
+        )}
+        {!singing && q.kind !== 'sight' && (
+          <button className="ghostBtn" onClick={() => playQuestion(q)}>↻ 再听一遍</button>
+        )}
+        {!singing && (
+          <div className={'optGrid' + (q.kind === 'melody' || q.kind === 'rhythm' ? ' staffOpts' : '') + (q.kind === 'timbre' ? ' instOpts' : '')}>
+            {opts.map(o => {
+              const cls =
+                'optBtn' +
+                (picked
+                  ? o.key === answerKey
+                    ? ' right'
+                    : o.key === picked
+                      ? ' wrongPick'
+                      : ' dim'
+                  : '')
               return (
-                <button key={opt} className={cls} onClick={() => answer(opt)}>
-                  {inst && <img src={inst.img} alt="" />}
-                  {opt}
+                <button key={o.key} className={cls} onClick={() => pick_(o.key)}>
+                  {o.node}
+                  <span>{o.label}</span>
                 </button>
-              );
+              )
             })}
           </div>
-          {picked && (
-            <p className={"feedback " + (picked === q.answer ? "ok" : "no")}>
-              {picked === q.answer ? "答对了！" : `正确答案：${q.answer}`}
-            </p>
-          )}
-        </>
-      )}
-    </div>
-  );
+        )}
+        {singing && q.kind === 'sight' && (
+          <Sing
+            target={q.midi}
+            onPass={() => {
+              setScore(s => s + 1)
+              setSinging(false)
+            }}
+            onSkip={() => setSinging(false)}
+          />
+        )}
+        {picked && !singing && (
+          <div className="fbRow">
+            <span className={picked === answerKey ? 'fbOk' : 'fbNo'}>
+              {picked === answerKey ? '答对了' : '正确答案已标出'}
+            </span>
+            <button className="primaryBtn" onClick={nextQuestion}>
+              {idx + 1 < quiz.length ? '下一题' : '看结果'}
+            </button>
+          </div>
+        )}
+        {picked && !singing && q.kind === 'sight' && picked !== answerKey && (
+          <div className="sightWrap">
+            <Staff clef={q.clef} midi={q.midi} midis={null} width={240} />
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  if (phase === 'done') {
+    const pass = score >= PASS_SCORE
+    return (
+      <div className="page">
+        <header className="brand">缪斯 Muse</header>
+        <div className="doneCard">
+          <h2>{pass ? '通关！' : '再练一次吧'}</h2>
+          <p className="doneScore">{score} / {quiz.length}</p>
+          <p>{pass ? `第 ${level + 1} 课已解锁。` : `答对 ${PASS_SCORE} 题即可过关。`}</p>
+          <div className="homeBtns">
+            {pass && level < LESSONS.length && (
+              <button className="primaryBtn" onClick={() => openLesson(level + 1)}>下一课</button>
+            )}
+            <button className={pass ? 'ghostBtn' : 'primaryBtn'} onClick={() => startQuiz(level)}>再练一次</button>
+            <button className="ghostBtn" onClick={() => setPhase('map')}>课程地图</button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (phase === 'placementDone') {
+    const target = PLACEMENT_TARGETS[plPassed] ?? 0
+    return (
+      <div className="page">
+        <header className="brand">缪斯 Muse</header>
+        <div className="doneCard">
+          <h2>定级完成</h2>
+          <p>{target >= 1 ? `你可以从第 ${target} 课开始。` : '从第 1 课开始，打牢基础。'}</p>
+          <button className="primaryBtn" onClick={() => { setPhase('map') }}>进入课程地图</button>
+        </div>
+      </div>
+    )
+  }
+
+  return null
 }
