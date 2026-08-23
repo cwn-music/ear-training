@@ -70,20 +70,20 @@ export default function Staff({ clef = 'treble', midi = null, midis, chord = fal
         notes = rhythm.flatMap(tok => tokNotes(tok, midi ?? 71))
       } else if (midis && midis.length > 0) {
         if (chord) {
-          const n = new StaveNote({ keys: midis.map(keyOf), duration: 'q' })
+          const n = new StaveNote({ keys: midis.map(keyOf), duration: 'w' })
           midis.forEach((m, i) => {
             if (needsAcc(m)) n.addModifier(new Accidental('#'), i)
           })
           notes = [n]
         } else {
           notes = midis.map(m => {
-            const n = new StaveNote({ keys: [keyOf(m)], duration: 'q' })
+            const n = new StaveNote({ keys: [keyOf(m)], duration: 'w' })
             if (needsAcc(m)) n.addModifier(new Accidental('#'), 0)
             return n
           })
         }
       } else if (midi !== null) {
-        const n = new StaveNote({ keys: [keyOf(midi)], duration: 'q' })
+        const n = new StaveNote({ keys: [keyOf(midi)], duration: 'w' })
         if (needsAcc(midi)) n.addModifier(new Accidental('#'), 0)
         notes = [n]
       }

@@ -356,14 +356,21 @@ export default function App() {
   const home = (
     <div className={'homePage' + (zooming ? ' zooming' : '')}>
       <button className="coverBtn" onClick={enterFromCover} aria-label="轻点海螺，进入学习">
-        <img className="hero cover" src="/muse.png" alt="缪斯 Muse" />
-        <span className="conchRipple" aria-hidden="true" />
-        <span className="coverHint">轻点海螺 · 进入学习</span>
+        <span className="coverFrame">
+          <img className="hero cover" src="/muse.png" alt="缪斯 Muse" />
+          <span className="conchRipple" aria-hidden="true" />
+          <span className="coverHint">轻点海螺 · 进入学习</span>
+        </span>
       </button>
       {maxUnlocked > 1 ? (
-        <button className="btn primary big" onClick={() => { warmup(); setPhase('map') }}>
-          继续学习 · 第 {maxUnlocked} 课
-        </button>
+        <>
+          <button className="btn primary big" onClick={() => { warmup(); setPhase('map') }}>
+            继续学习 · 第 {maxUnlocked} 课
+          </button>
+          <button className="btn ghost" onClick={() => { warmup(); startPlacement() }}>
+            重新定级测试
+          </button>
+        </>
       ) : (
         <>
           <button className="btn primary big" onClick={() => { warmup(); startPlacement() }}>
@@ -464,6 +471,12 @@ export default function App() {
           <div className="singBox">
             <p>答对了！跟着把它唱出来：</p>
             <Staff clef="treble" midi={q.midi} width={260} />
+            <div className="staffBox">
+              <Piano highlight={[q.midi]} from={Math.min(60, q.midi)} to={Math.max(71, q.midi)} />
+            </div>
+            <button className="btn ghost" onClick={() => { void ensureAudio().then(() => playNote(q.midi, 1.2, 0.9)) }}>
+              ▶ 再听一遍
+            </button>
             <Sing target={q.midi} ghostMic={new URLSearchParams(location.search).has('ghostMic')} onDone={singDone} />
             <button className="btn ghost small" onClick={() => singDone(true)}>跳过跟唱</button>
           </div>
