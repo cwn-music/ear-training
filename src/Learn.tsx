@@ -1,307 +1,339 @@
-// 缪斯 Muse · 学习页（每课概念卡 + 谱例 + 范听）
-import type { ReactNode } from 'react'
+// 缪斯 Muse · 学习页（概念卡 + 范听）
+import { useEffect, useState, type ReactNode } from 'react'
+import { lessonOf, INSTRUMENTS } from './lessons'
+import { ensureAudio, playMelody, playRhythm, playTwo, initInstruments, playInstrumentMelody, playNote } from './audio'
+import { INTERVAL_NAMES } from './theory'
 import Staff from './Staff'
-import { INTERVAL_NAMES, SCALE_STEPS } from './theory'
-import { playInstrumentMelody, playMelody, playRhythm, playScaleNotes, playTwo } from './audio'
-import { INSTRUMENTS } from './lessons'
+import Piano from './Piano'
 
-export const INTERVAL_DESCS: Record<number, string> = {
-  1: '小二度：相距 1 个半音', 2: '大二度：相距 2 个半音',
-  3: '小三度：相距 3 个半音', 4: '大三度：相距 4 个半音',
-  5: '纯四度：相距 5 个半音', 6: '增四度：相距 6 个半音',
-  7: '纯五度：相距 7 个半音', 8: '小六度：相距 8 个半音',
-  9: '大六度：相距 9 个半音', 10: '小七度：相距 10 个半音',
-  11: '大七度：相距 11 个半音', 12: '纯八度：相距 12 个半音，频率比 2:1',
+interface Props {
+  lessonId: number
+  onStart: () => void
+  onBack: () => void
+}
+
+const INTERVAL_DESCS: Record<number, string> = {
+  1: '小二度：紧挨着的两个音，最窄的距离',
+  2: '大二度：相隔一个键的距离，像台阶',
+  3: '小三度：三个半音，色彩偏暗',
+  4: '大三度：四个半音，色彩明亮',
+  5: '纯四度：开阔而空洞',
+  6: '增四度：不稳定，需要解决',
+  7: '纯五度：最稳定的音程之一',
+  8: '小六度：柔和而忧伤',
+  9: '大六度：宽广明亮',
+  10: '小七度：紧张，想要上行解决',
+  11: '大七度：距离八度只差半步',
+  12: '纯八度：同一个音的高低重复',
 }
 
 function Card({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <section className="card">
+    <div className="learnCard">
       <h3>{title}</h3>
-      {children}
-    </section>
+      <div className="learnBody">{children}</div>
+    </div>
   )
 }
 
-function PlayBtn({ label, onClick }: { label: string; onClick: () => void }) {
+function PlayBtn({ label, onPlay }: { label: string; onPlay: () => void }) {
+  const [busy, setBusy] = useState(false)
   return (
-    <button className="playBtn" onClick={onClick}>
+    <button
+      className="btn ghost small"
+      disabled={busy}
+      onClick={() => {
+        setBusy(true)
+        void ensureAudio().then(() => {
+          onPlay()
+          setTimeout(() => setBusy(false), 1600)
+        })
+      }}
+    >
       ▶ {label}
     </button>
   )
 }
 
-function IntervalCard({ semis, a }: { semis: number; a: number }) {
+function IntervalCard({ semis }: { semis: number }) {
   return (
-    <div className="intCard">
-      <div className="intName">{INTERVAL_NAMES[semis]}</div>
-      <div className="intDesc">{INTERVAL_DESCS[semis]}</div>
-      <Staff midi={null} midis={[a, a + semis]} width={200} height={110} />
-      <PlayBtn label="范听" onClick={() => playTwo(a, a + semis)} />
+    <div className="intervalRow">
+      <div className="intervalName">{INTERVAL_NAMES[semis]}</div>
+      <div className="intervalDesc">{INTERVAL_DESCS[semis]}</div>
+      <PlayBtn label="先后" onPlay={() => playMelody([60, 60 + semis], 0.5)} />
+      <PlayBtn label="同时" onPlay={() => { playMelody([60], 0, 1.4); playMelody([60 + semis], 0, 1.4) }} />
     </div>
   )
 }
 
-export function renderBody(id: number): ReactNode {
-  switch (id) {
-    case 1:
-      return (
-        <>
-          <Card title="声音从哪里来">
-            <p>声音由物体振动产生，振动经空气传播到耳朵。每秒振动的次数叫频率，单位是赫兹（Hz）。人耳能听到的范围约为 20 至 20000 Hz。</p>
-            <PlayBtn label="听一个低音" onClick={() => playTwo(48, 48)} />
-            <PlayBtn label="听一个高音" onClick={() => playTwo(72, 72)} />
+export default function Learn({ lessonId, onStart, onBack }: Props) {
+  const lesson = lessonOf(lessonId)
+
+  useEffect(() => {
+    if (lessonId === 12) void initInstruments()
+  }, [lessonId])
+
+  const renderBody = () => {
+    switch (lessonId) {
+      case 1:
+        return (
+          <>
+            <Card title="认识琴键">
+              <p>钢琴的白键七个一组，依次是 do re mi fa sol la si。最中间那组的 do 叫「中央 do」。</p>
+              <p>点一点琴键，听听它们的声音：</p>
+              <Piano interactive highlight={[60, 62, 64]} />
+            </Card>
+            <Card title="今天要练">
+              <p>只认三个音：do re mi。听一听声音、看一看位置、说一说名字。</p>
+              <PlayBtn label="do" onPlay={() => playNote(60)} />
+              <PlayBtn label="re" onPlay={() => playNote(62)} />
+              <PlayBtn label="mi" onPlay={() => playNote(64)} />
+            </Card>
+          </>
+        )
+      case 2:
+        return (
+          <>
+            <Card title="键盘上的高与低">
+              <p>琴键越靠右，声音越高；越靠左，声音越低。</p>
+              <Piano interactive highlight={[53, 67]} marks={{ 53: '低', 67: '高' }} from={53} to={71} />
+            </Card>
+            <Card title="听一听">
+              <p>先听一个低音，再听一个高音：</p>
+              <PlayBtn label="低 → 高" onPlay={() => playTwo(53, 67, { gap: 0.6 })} />
+              <PlayBtn label="高 → 低" onPlay={() => playTwo(67, 53, { gap: 0.6 })} />
+            </Card>
+            <Card title="今天要练">
+              <p>听两个音，说出第二个音比第一个高还是低。答完题，看一看它们在琴键上隔了多远。</p>
+            </Card>
+          </>
+        )
+      case 3:
+        return (
+          <>
+            <Card title="声音有长有短">
+              <p>一个音可以很短，也可以拖得很长。长与短由它持续的时间决定。</p>
+              <PlayBtn label="短" onPlay={() => playNote(60, 0.25)} />
+              <PlayBtn label="长" onPlay={() => playNote(60, 1.6)} />
+            </Card>
+            <Card title="今天要练">
+              <p>听两个音，说出第二个音更长还是更短。</p>
+            </Card>
+          </>
+        )
+      case 4:
+        return (
+          <>
+            <Card title="声音有强有弱">
+              <p>同一个音，可以轻轻弹，也可以重重弹。轻轻弹声音弱，重重弹声音强。</p>
+              <PlayBtn label="弱" onPlay={() => playNote(60, 0.9, 0.35)} />
+              <PlayBtn label="强" onPlay={() => playNote(60, 0.9, 1)} />
+            </Card>
+            <Card title="今天要练">
+              <p>听两个音，说出第二个音更响还是更轻。</p>
+            </Card>
+          </>
+        )
+      case 5:
+        return (
+          <>
+            <Card title="五线谱是音高的地图">
+              <p>五条线，从下到上。音越高，位置越高。音符落在线上或线间。</p>
+              <Staff clef="treble" midi={64} width={300} />
+              <p className="tip">高音谱号又叫做 sol 谱号：它的圆圈绕着第二线，第二线上的音就是 sol。do（中央 do）住在五线谱下面的下加一线上。</p>
+              <Staff clef="treble" midi={60} width={300} />
+            </Card>
+            <Card title="看谱 → 唱名">
+              <p>先看音符的位置，说出它是什么音，再把它唱出来。</p>
+            </Card>
+          </>
+        )
+      case 6:
+        return (
+          <>
+            <Card title="二度 · 相邻的音">
+              <p>相邻的两个音之间叫「二度」。它们挨得很近，听起来有一点点挤。</p>
+              <IntervalCard semis={1} />
+              <IntervalCard semis={2} />
+            </Card>
+          </>
+        )
+      case 7:
+        return (
+          <>
+            <Card title="三度 · 隔一个白键">
+              <p>三度比二度宽一点。大三度明亮，小三度柔和。</p>
+              <IntervalCard semis={3} />
+              <IntervalCard semis={4} />
+            </Card>
+          </>
+        )
+      case 8:
+        return (
+          <>
+            <Card title="五度与八度">
+              <p>纯五度开阔稳定；纯八度是同一个音在高处的重复，听起来几乎「重合」。</p>
+              <IntervalCard semis={7} />
+              <IntervalCard semis={12} />
+            </Card>
+          </>
+        )
+      case 9:
+        return (
+          <>
+            <Card title="级进与跳进">
+              <p>音与音挨着走，叫「级进」，像走台阶；隔得远，叫「跳进」，像跳格子。</p>
+              <PlayBtn label="级进" onPlay={() => playMelody([60, 62, 64])} />
+              <PlayBtn label="跳进" onPlay={() => playMelody([60, 64, 67])} />
+            </Card>
+          </>
+        )
+      case 10:
+        return (
+          <>
+            <Card title="旋律会走路">
+              <p>一串音可以一直往上走（上行）、一直往下走（下行），也可以原地不动（同音反复）。</p>
+              <PlayBtn label="上行" onPlay={() => playMelody([60, 62, 64, 65])} />
+              <PlayBtn label="下行" onPlay={() => playMelody([65, 64, 62, 60])} />
+              <PlayBtn label="同音反复" onPlay={() => playMelody([62, 62, 62])} />
+            </Card>
+          </>
+        )
+      case 11:
+        return (
+          <>
+            <Card title="拍子会循环">
+              <p>二拍子：强、弱，像走路。三拍子：强、弱、弱，像转圆圈。</p>
+              <PlayBtn label="二拍子" onPlay={() => playRhythm(['q', 'q', 'q', 'q'], 72, 2)} />
+              <PlayBtn label="三拍子" onPlay={() => playRhythm(['q', 'q', 'q', 'q', 'q', 'q'], 72, 3)} />
+            </Card>
+          </>
+        )
+      case 12:
+        return (
+          <>
+            <Card title="四种乐器的颜色">
+              <p>同一个旋律，不同的乐器唱出来，味道完全不同。这就是「音色」。</p>
+              <div className="instGrid">
+                {INSTRUMENTS.map(inst => (
+                  <div key={inst.id} className="instCard">
+                    <img src={inst.img} alt={inst.name} />
+                    <div className="instName">{inst.name}</div>
+                    <div className="instDesc">{inst.desc}</div>
+                    <button
+                      className="btn ghost small"
+                      onClick={() => {
+                        void initInstruments().then(() => playInstrumentMelody(inst.id, [60, 62, 64, 65]))
+                      }}
+                    >
+                      ▶ 听一听
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          </>
+        )
+      case 13:
+        return (
+          <Card title="复习">
+            <p>这一课把单元二学到的内容混在一起练：二度三度、级进跳进、旋律走向、拍子与节奏、乐器音色。</p>
           </Card>
-          <Card title="今天要练">
-            <p>听两个先后出现的音，分辨第二个音更高还是更低。先听大跨度，很容易分辨。</p>
-          </Card>
-        </>
-      )
-    case 2:
-      return (
-        <>
-          <Card title="音的高低">
-            <p>频率越高，音就越高。钢琴从左到右音越来越高，中央 C 的频率约 261.63 Hz。</p>
-            <Staff midi={null} midis={[48, 60, 72]} width={240} />
-            <PlayBtn label="范听：由低到高" onClick={() => playMelody([48, 60, 72], 0.4)} />
-          </Card>
-          <Card title="今天要练">
-            <p>继续分辨高低，并开始认识音的名字：C D E F G A B 对应唱名 do re mi fa sol la si。</p>
-          </Card>
-        </>
-      )
-    case 3:
-      return (
-        <>
-          <Card title="音的长短">
-            <p>音的长短指振动持续的时间。记谱上用音值表示相对长短：一个全音符等于 2 个二分音符，等于 4 个四分音符。</p>
-            <PlayBtn label="范听：先短后长" onClick={() => playTwo(60, 60, { da: 0.3, db: 1.2 })} />
-            <PlayBtn label="范听：先长后短" onClick={() => playTwo(64, 64, { da: 1.2, db: 0.3 })} />
-          </Card>
-          <Card title="今天要练">
-            <p>听两个音，分辨第二个音更长还是更短。注意保持注意力到音的结尾。</p>
-          </Card>
-        </>
-      )
-    case 4:
-      return (
-        <>
-          <Card title="音的强弱">
-            <p>振动的幅度（振幅）越大，声音越响。乐谱上的力度记号来自意大利语：piano（p，弱）、forte（f，强）、mezzo（m，中等）。</p>
-            <PlayBtn label="范听：先轻后响" onClick={() => playTwo(60, 60, { va: 0.35, vb: 1 })} />
-            <PlayBtn label="范听：先响后轻" onClick={() => playTwo(64, 64, { va: 1, vb: 0.35 })} />
-          </Card>
-          <Card title="今天要练">
-            <p>听两个音，分辨第二个音更响还是更轻。音高和长短都一样，只比强弱。</p>
-          </Card>
-        </>
-      )
-    case 5:
-      return (
-        <>
-          <Card title="五线谱与高音谱号">
-            <p>五线谱有五条线和四个间。高音谱号又称 G 谱号，它的螺旋中心围绕第二线，第二线上的音是 G4（sol）。中央 C（do）在下加一线上。</p>
-            <Staff midi={null} midis={[60, 62, 64, 65, 67, 69, 71]} width={320} />
-            <PlayBtn label="范听：do 到 si" onClick={() => playMelody([60, 62, 64, 65, 67, 69, 71], 0.3)} />
-          </Card>
-          <Card title="今天要练">
-            <p>看谱认音：认出它叫什么名字，再开口把它唱准。</p>
-          </Card>
-        </>
-      )
-    case 6:
-      return (
-        <>
-          <Card title="二度音程">
-            <p>音程是两个音之间的距离。二度是相邻的两个音级：小二度相距 1 个半音，大二度相距 2 个半音。</p>
-            <div className="intRow">
-              <IntervalCard semis={1} a={60} />
-              <IntervalCard semis={2} a={60} />
-            </div>
-          </Card>
-        </>
-      )
-    case 7:
-      return (
-        <>
-          <Card title="三度音程">
-            <p>三度跨过三个音级：小三度相距 3 个半音，大三度相距 4 个半音。</p>
-            <div className="intRow">
-              <IntervalCard semis={3} a={60} />
-              <IntervalCard semis={4} a={60} />
-            </div>
-          </Card>
-        </>
-      )
-    case 8:
-      return (
-        <>
-          <Card title="五度与八度">
-            <p>纯五度相距 7 个半音，纯八度相距 12 个半音。纯八度的两个音，频率比正好是 2:1。</p>
-            <div className="intRow">
-              <IntervalCard semis={7} a={55} />
-              <IntervalCard semis={12} a={55} />
-            </div>
-          </Card>
-        </>
-      )
-    case 9:
-      return (
-        <>
-          <Card title="级进与跳进">
-            <p>相邻音级之间的进行（不超过 2 个半音）叫级进；超过二度的进行叫跳进。</p>
-            <PlayBtn label="范听：级进" onClick={() => playMelody([60, 62, 64, 65], 0.3)} />
-            <PlayBtn label="范听：跳进" onClick={() => playMelody([60, 67, 62, 72], 0.3)} />
-          </Card>
-          <Card title="旋律的走向">
-            <p>旋律可以上行（越来越高）、下行（越来越低）或同音反复（同一个音重复）。</p>
-          </Card>
-        </>
-      )
-    case 10:
-      return (
-        <>
-          <Card title="旋律的走向">
-            <p>上行：音一个比一个高；下行：一个比一个低；同音反复：同一个音连续重复。更长的旋律还会出现先上后下的波浪形。</p>
-            <PlayBtn label="上行" onClick={() => playMelody([60, 63, 65, 67], 0.3)} />
-            <PlayBtn label="下行" onClick={() => playMelody([67, 65, 63, 60], 0.3)} />
-            <PlayBtn label="同音反复" onClick={() => playMelody([62, 62, 62], 0.3)} />
-          </Card>
-        </>
-      )
-    case 11:
-      return (
-        <>
-          <Card title="二拍子与三拍子">
-            <p>拍号写在谱号后面。2/4 拍以四分音符为一拍、每小节两拍，强弱规律是「强、弱」；3/4 拍每小节三拍，规律是「强、弱、弱」。</p>
-            <PlayBtn label="范听：二拍子" onClick={() => playRhythm(['q', 'q', 'q', 'q'], 72, 2)} />
-            <PlayBtn label="范听：三拍子" onClick={() => playRhythm(['q', 'q', 'q', 'q', 'q', 'q'], 72, 3)} />
-          </Card>
-          <Card title="今天要练">
-            <p>听一段节奏，找重音落在第几拍：每隔一拍重一次是二拍子，每隔两拍重一次是三拍子。</p>
-          </Card>
-        </>
-      )
-    case 12:
-      return (
-        <>
-          <Card title="四种乐器">
-            <div className="instGrid">
-              {INSTRUMENTS.map(inst => (
-                <div className="instCard" key={inst.id}>
-                  <img src={inst.img} alt={inst.name} />
-                  <div className="instName">{inst.name}</div>
-                  <p>{inst.desc}</p>
-                  <PlayBtn label="范听" onClick={() => void playInstrumentMelody(inst.id, [60, 64, 67], 0.35)} />
-                </div>
-              ))}
-            </div>
-          </Card>
-        </>
-      )
-    case 13:
-      return (
-        <>
-          <Card title="单元二复习">
-            <p>这一课把前面学过的混在一起：二度、三度、五度、八度音程，级进与跳进，节奏型，短旋律。答错的内容会被记住，之后优先再练。</p>
-          </Card>
-        </>
-      )
-    case 14:
-      return (
-        <>
+        )
+      case 14:
+        return (
           <Card title="高音谱表进阶">
-            <p>识谱范围扩展到上加间：从 A3 一直到 E5。位置越高，音越高。</p>
-            <Staff midi={null} midis={[57, 60, 64, 67, 72, 76]} width={320} />
-            <PlayBtn label="范听" onClick={() => playMelody([57, 60, 64, 67, 72, 76], 0.28)} />
+            <p>五线谱还可以往下加线、往上加线，装下更低和更高的音。这一课我们把认谱范围放宽到低音 la 到高音 mi。</p>
+            <Staff clef="treble" midi={76} width={300} />
           </Card>
-        </>
-      )
-    case 15:
-      return (
-        <>
-          <Card title="低音谱表">
-            <p>低音谱号又称 F 谱号，它的两个点夹住第四线，第四线上的音是 F3（fa）。低音谱表用来记较低的音。</p>
-            <Staff clef="bass" midi={null} midis={[40, 43, 45, 48, 50, 52, 55]} width={320} />
-            <PlayBtn label="范听" onClick={() => playMelody([40, 43, 45, 48, 50, 52, 55], 0.28)} />
+        )
+      case 15:
+        return (
+          <>
+            <Card title="低音谱号">
+              <p>低音谱号又叫做 fa 谱号：它的两个点夹着第四线，第四线上的音就是 fa。左手的低音区常用它。</p>
+              <Staff clef="bass" midi={53} width={300} />
+            </Card>
+          </>
+        )
+      case 16:
+        return (
+          <Card title="更长的旋律">
+            <p>现在一次要记四到五个音。诀窍：先听出它的走向，再留意哪个音「不一样」。</p>
+            <PlayBtn label="试一试" onPlay={() => playMelody([60, 62, 65, 64, 67])} />
           </Card>
-        </>
-      )
-    case 16:
-      return (
-        <>
-          <Card title="旋律小乐句">
-            <p>几个音连起来就成了一小句旋律。听的时候先抓住走向（上行还是下行），再分辨具体的音。</p>
-            <PlayBtn label="范听一条小乐句" onClick={() => playMelody([60, 64, 62, 65, 67], 0.32)} />
-          </Card>
-        </>
-      )
-    case 17:
-      return (
-        <>
-          <Card title="附点、十六分与休止">
-            <p>附点把前面音符的时值延长一半：附点四分音符等于 1.5 拍。四个十六分音符合起来是一拍。休止符表示安静一拍。</p>
-            <Staff rhythm={['q.', 'ee', 'eeee', 'q']} width={320} />
-            <PlayBtn label="范听" onClick={() => playRhythm(['q.', 'ee', 'eeee', 'q'], 72)} />
-          </Card>
-        </>
-      )
-    case 18:
-      return (
-        <>
-          <Card title="音程总表">
-            <p>目前学过的所有音程，按半音数排列：</p>
-            <ul className="intList">
-              {[1, 2, 3, 4, 5, 7, 8, 9, 12].map(s => (
-                <li key={s}>{INTERVAL_DESCS[s]}</li>
-              ))}
-            </ul>
-          </Card>
-        </>
-      )
-    case 19:
-      return (
-        <>
-          <Card title="大调与小调">
-            <p>大调音阶的半音在第 3–4 级和第 7–8 级之间（全、全、半、全、全、全、半）。自然小调的半音在第 2–3 级和第 5–6 级之间。</p>
-            <PlayBtn label="范听：大调" onClick={() => playScaleNotes(60, SCALE_STEPS.major)} />
-            <PlayBtn label="范听：小调" onClick={() => playScaleNotes(60, SCALE_STEPS.minor)} />
-          </Card>
-        </>
-      )
-    case 20:
-      return (
-        <>
-          <Card title="变化音">
-            <p>升号 ♯ 把音升高半个音，降号 ♭ 降低半个音。钢琴上的黑键就是变化音。</p>
-            <Staff midi={null} midis={[60, 61, 62, 63, 64]} width={300} />
-            <PlayBtn label="范听：半音上行" onClick={() => playMelody([60, 61, 62, 63, 64], 0.3)} />
-          </Card>
-        </>
-      )
-    case 21:
-      return (
-        <>
+        )
+      case 17:
+        return (
+          <>
+            <Card title="附点与更密的节奏">
+              <p>音符后面的小点叫「附点」，让这个音变长一半。四个十六分音符挤在一拍里，跑得飞快。</p>
+              <PlayBtn label="附点节奏" onPlay={() => playRhythm(['q.', 'ee', 'q', 'q'])} />
+              <PlayBtn label="十六分" onPlay={() => playRhythm(['eeee', 'q', 'q', 'q'])} />
+            </Card>
+          </>
+        )
+      case 18:
+        return (
+          <>
+            <Card title="音程大集合">
+              <p>把学过的音程放在一起听：先从最像的一对里分辨，再听最不相似的。</p>
+              {[2, 3, 4, 5, 7, 9, 12].map(s => <IntervalCard key={s} semis={s} />)}
+            </Card>
+          </>
+        )
+      case 19:
+        return (
+          <>
+            <Card title="大调明亮，小调柔和">
+              <p>同样是 do 开头的一串音，大调听起来明亮坚定，小调听起来柔和忧郁。差别在第三个音。</p>
+              <PlayBtn label="大调音阶" onPlay={() => playMelody([60, 62, 64, 65, 67, 69, 71, 72], 0.06, 0.5)} />
+              <PlayBtn label="小调音阶" onPlay={() => playMelody([60, 62, 63, 65, 67, 68, 70, 72], 0.06, 0.5)} />
+            </Card>
+          </>
+        )
+      case 20:
+        return (
+          <>
+            <Card title="黑键加入">
+              <p>白键之间的黑键叫「变化音」。带 ♯ 的音比原来高半个音。现在识音题里会出现黑键了。</p>
+              <Piano interactive highlight={[61]} />
+            </Card>
+          </>
+        )
+      case 21:
+        return (
           <Card title="视唱综合">
-            <p>看谱时先读节奏、再读音高，然后开口唱。唱的时候保持气息平稳，音要唱满时值。</p>
+            <p>看着谱子，先在心里听到它，再唱出来。唱错了没关系，多听一遍范唱再试。</p>
+            <Staff clef="treble" midi={67} width={300} />
           </Card>
-        </>
-      )
-    case 22:
-      return (
-        <>
+        )
+      case 22:
+        return (
           <Card title="全音域识谱">
-            <p>高音谱表和低音谱表合起来，覆盖从大字组到小字二组的音。遇到变化音，先看升降号再唱。</p>
+            <p>高音谱表和低音谱表混合出现，黑键也会出现。看清谱号，再看位置。</p>
+            <Staff clef="bass" midi={50} width={300} />
+            <Staff clef="treble" midi={73} width={300} />
           </Card>
-        </>
-      )
-    default:
-      return (
-        <>
+        )
+      case 23:
+        return (
           <Card title="毕业音乐会">
-            <p>最后一课把所有内容合在一起：高低、长短、强弱、走向、拍号、音程、旋律、节奏、音阶、音色、识谱与视唱。准备好就开始吧。</p>
+            <p>最后一课：所有题型综合登场。放轻松，把每一次答题都当作一次小演出。</p>
           </Card>
-        </>
-      )
+        )
+      default:
+        return null
+    }
   }
+
+  return (
+    <div className="learnPage">
+      <button className="backLink" onClick={onBack}>‹ 返回地图</button>
+      <h2>第 {lesson.id} 课 · {lesson.title}</h2>
+      <p className="goal">{lesson.goal}</p>
+      {renderBody()}
+      <button className="btn primary big" onClick={onStart}>开始练习</button>
+    </div>
+  )
 }

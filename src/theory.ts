@@ -10,7 +10,7 @@ export const TOK_BEATS: Record<Tok, number> = { q: 1, ee: 1, eeee: 1, h: 2, 'q.'
 export type InstId = 'piano' | 'violin' | 'flute' | 'trumpet'
 
 // —— 题型定义 ——
-export type PitchQ = { kind: 'pitch'; midi: number; options: number[] }
+export type PitchQ = { kind: 'pitch'; midi: number; options: number[]; keys: boolean }
 export type StepleapQ = { kind: 'stepleap'; a: number; b: number; answer: 'step' | 'leap' }
 export type IntervalQ = { kind: 'interval'; a: number; b: number; semis: number; options: number[] }
 export type MelodyQ = { kind: 'melody'; notes: number[]; options: number[][] }
@@ -47,10 +47,12 @@ function shuffle<T>(arr: T[]): T[] {
 }
 const isWhite = (m: number) => [0, 2, 4, 5, 7, 9, 11].includes(m % 12)
 
-const NOTE_NAMES = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B']
+export const NOTE_NAMES = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B']
 const SOLFEGE = ['do', 'do♯', 're', 're♯', 'mi', 'fa', 'fa♯', 'sol', 'sol♯', 'la', 'la♯', 'si']
 export const nameOf = (midi: number) => NOTE_NAMES[midi % 12] + (Math.floor(midi / 12) - 1)
 export const solfegeOf = (midi: number) => SOLFEGE[midi % 12]
+// 界面展示用：只给唱名 + 音名，不带八度数字（如 do（C））
+export const displayName = (midi: number) => `${solfegeOf(midi)}（${NOTE_NAMES[midi % 12]}）`
 
 export const INTERVAL_NAMES: Record<number, string> = {
   1: '小二度', 2: '大二度', 3: '小三度', 4: '大三度', 5: '纯四度', 6: '增四度',
@@ -61,8 +63,18 @@ export const INTERVAL_NAMES: Record<number, string> = {
 export const PITCH_DELTAS = [-12, -7, -5, -4, -2, -1, 1, 2, 4, 5, 7, 12]
 
 function pitchOptions(midi: number, pool: (d: number) => boolean): number[] {
-  const deltas = shuffle(PITCH_DELTAS.filter(d => pool(midi + d))).slice(0, 3)
-  return shuffle([midi, ...deltas.map(d => midi + d)])
+  // 界面只显示唱名+音名（不带八度），所以选项的音名必须互不重复，避免两个「fa（F）」
+  const seen = new Set<number>([midi % 12])
+  const out: number[] = []
+  for (const d of shuffle(PITCH_DELTAS)) {
+    const m = midi + d
+    if (!pool(m)) continue
+    if (seen.has(m % 12)) continue
+    seen.add(m % 12)
+    out.push(m)
+    if (out.length === 3) break
+  }
+  return shuffle([midi, ...out])
 }
 
 // —— 随机漫步旋律 ——
@@ -83,13 +95,19 @@ export function randomWalkMelody(n: number, lo: number, hi: number): number[] {
 
 // —— 各题型生成器 ——
 function genPitch(level: number): PitchQ {
+  // 第 1~2 课：只认 do re mi 三个白键，键盘高亮辅助（声音↔琴键↔唱名关联）
+  if (level <= 2) {
+    const midi = pick([60, 62, 64])
+    const options = shuffle([60, 62, 64])
+    return { kind: 'pitch', midi, options, keys: true }
+  }
   const all = level >= 20
   let midi = 60
   for (let t = 0; t < 30; t++) {
     midi = rand(55, 79)
     if (all || isWhite(midi)) break
   }
-  return { kind: 'pitch', midi, options: pitchOptions(midi, m => m >= 48 && m <= 83 && (all || isWhite(m))) }
+  return { kind: 'pitch', midi, options: pitchOptions(midi, m => m >= 48 && m <= 83 && (all || isWhite(m))), keys: false }
 }
 
 function genStepleap(): StepleapQ {
@@ -181,10 +199,12 @@ export function makeSightQuestion(level: number): SightQ {
 
 // —— 第一批新题型生成器 ——
 function genPitchCmp(level: number): PitchCmpQ {
-  const gaps = level <= 4 ? [5, 7, 12] : [2, 3, 4]
+  // 初级（1~2 课）只用五度/八度大跨度，且不出「一样高」
+  const gaps = level <= 2 ? [7, 12] : level <= 4 ? [5, 7, 12] : [2, 3, 4]
+  const withSame = level > 4
   for (let t = 0; t < 30; t++) {
     const roll = Math.random()
-    const answer: Cmp3 = roll < 0.42 ? 'up' : roll < 0.84 ? 'down' : 'same'
+    const answer: Cmp3 = !withSame ? (roll < 0.5 ? 'up' : 'down') : roll < 0.42 ? 'up' : roll < 0.84 ? 'down' : 'same'
     const a = rand(48, 76)
     const g = pick(gaps)
     const b = answer === 'same' ? a : answer === 'up' ? a + g : a - g
@@ -196,17 +216,29 @@ function genPitchCmp(level: number): PitchCmpQ {
 
 function genDurCmp(level: number): DurCmpQ {
   const midi = rand(55, 72)
-  const [short, long] = level <= 3 ? [0.3, 1.1] : [0.45, 0.85]
+  const [short, long] = level <= 4 ? [0.3, 1.1] : [0.45, 0.85]
+  const withSame = level > 4
   const roll = Math.random()
-  if (roll < 0.42) return { kind: 'durcmp', midi, da: short, db: long, answer: 'longer' }
-  if (roll < 0.84) return { kind: 'durcmp', midi, da: long, db: short, answer: 'shorter' }
+  if (roll < 0.5 || !withSame) {
+    return roll < 0.25 || !withSame && roll < 0.5
+      ? { kind: 'durcmp', midi, da: short, db: long, answer: 'longer' }
+      : { kind: 'durcmp', midi, da: long, db: short, answer: 'shorter' }
+  }
+  if (roll < 0.8) return { kind: 'durcmp', midi, da: short, db: long, answer: 'longer' }
+  if (roll < 0.9) return { kind: 'durcmp', midi, da: long, db: short, answer: 'shorter' }
   return { kind: 'durcmp', midi, da: 0.7, db: 0.7, answer: 'same' }
 }
 
 function genDynCmp(level: number): DynCmpQ {
   const midi = rand(55, 72)
   const [soft, loud] = level <= 4 ? [0.35, 1] : [0.55, 0.85]
+  const withSame = level > 4
   const roll = Math.random()
+  if (!withSame) {
+    return roll < 0.5
+      ? { kind: 'dyncmp', midi, va: soft, vb: loud, answer: 'louder' }
+      : { kind: 'dyncmp', midi, va: loud, vb: soft, answer: 'softer' }
+  }
   if (roll < 0.42) return { kind: 'dyncmp', midi, va: soft, vb: loud, answer: 'louder' }
   if (roll < 0.84) return { kind: 'dyncmp', midi, va: loud, vb: soft, answer: 'softer' }
   return { kind: 'dyncmp', midi, va: 0.7, vb: 0.7, answer: 'same' }
@@ -258,10 +290,10 @@ function genMeter(): MeterQ {
 
 // —— 各级题型池 ——
 export const LEVEL_KINDS: Record<number, Kind[]> = {
-  1: ['pitchcmp'],
+  1: ['pitch'],
   2: ['pitchcmp', 'pitch'],
-  3: ['durcmp', 'pitchcmp'],
-  4: ['dyncmp', 'durcmp'],
+  3: ['durcmp'],
+  4: ['dyncmp'],
   5: ['sight', 'pitch'],
   6: ['interval', 'pitch'],
   7: ['interval', 'pitch'],

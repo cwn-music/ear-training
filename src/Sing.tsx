@@ -1,108 +1,114 @@
-// 缪斯 Muse · 跟唱校准（pitchy 音高检测）
+// 缪斯 Muse · 跟唱校准（pitchy 基频检测）
 import { useEffect, useRef, useState } from 'react'
 import { PitchDetector } from 'pitchy'
-import { nameOf, solfegeOf } from './theory'
+import { displayName } from './theory'
 
 interface Props {
   target: number
-  onPass: () => void
-  onSkip: () => void
+  ghostMic?: boolean // 冒烟测试：不申请麦克风，直接成功
+  onDone: (ok: boolean) => void
 }
 
+const CLARITY = 0.9
+const TOL = 0.75 // 半音容差
 const NEED_FRAMES = 12
 const TIMEOUT_MS = 12000
 
-export default function Sing({ target, onPass, onSkip }: Props) {
-  const [heard, setHeard] = useState('')
-  const [cents, setCents] = useState<number | null>(null)
-  const [frames, setFrames] = useState(0)
-  const [failed, setFailed] = useState(false)
-  const passRef = useRef(onPass)
-  passRef.current = onPass
-  const skipRef = useRef(onSkip)
-  skipRef.current = onSkip
+const midiOfFreq = (f: number) => 69 + 12 * Math.log2(f / 440)
+
+export default function Sing({ target, ghostMic = false, onDone }: Props) {
+  const [heard, setHeard] = useState<number | null>(null)
+  const [state, setState] = useState<'init' | 'listening' | 'done'>('init')
+  const doneRef = useRef(false)
+  const onDoneRef = useRef(onDone)
+  onDoneRef.current = onDone
 
   useEffect(() => {
-    let alive = true
+    if (ghostMic) {
+      const t = setTimeout(() => {
+        if (!doneRef.current) {
+          doneRef.current = true
+          setState('done')
+          onDoneRef.current(true)
+        }
+      }, 400)
+      return () => clearTimeout(t)
+    }
     let stream: MediaStream | null = null
     let ctx: AudioContext | null = null
     let raf = 0
-    const timer = window.setTimeout(() => {
-      if (alive) setFailed(true)
-    }, TIMEOUT_MS)
+    let timer: ReturnType<typeof setTimeout> | null = null
+    let cancelled = false
+    let streak = 0
 
-    async function boot() {
+    const finish = (ok: boolean) => {
+      if (doneRef.current) return
+      doneRef.current = true
+      setState('done')
+      if (timer) clearTimeout(timer)
+      stream?.getTracks().forEach(t => t.stop())
+      void ctx?.close().catch(() => undefined)
+      onDoneRef.current(ok)
+    }
+
+    const run = async () => {
       try {
         stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-        if (!alive) return
-        ctx = new AudioContext()
-        const src = ctx.createMediaStreamSource(stream)
-        const analyser = ctx.createAnalyser()
-        analyser.fftSize = 2048
-        src.connect(analyser)
-        const detector = PitchDetector.forFloat32Array(analyser.fftSize)
-        const buf = new Float32Array(analyser.fftSize)
-        const loop = () => {
-          if (!alive || !ctx) return
-          analyser.getFloatTimeDomainData(buf)
-          const [freq, clarity] = detector.findPitch(buf, ctx.sampleRate)
-          if (clarity > 0.9 && freq > 50) {
-            const m = 69 + 12 * Math.log2(freq / 440)
-            const diff = ((((m - target) % 12) + 18) % 12) - 6
-            setHeard(nameOf(Math.round(m)))
-            setCents(Math.round(diff * 100))
-            if (Math.abs(diff) <= 0.75) {
-              setFrames(f => {
-                const n = f + 1
-                if (n >= NEED_FRAMES && alive) {
-                  alive = false
-                  window.clearTimeout(timer)
-                  passRef.current()
-                }
-                return n
-              })
-            } else {
-              setFrames(0)
-            }
-          }
-          raf = requestAnimationFrame(loop)
-        }
-        loop()
       } catch {
-        if (alive) setFailed(true)
+        finish(false)
+        return
       }
+      if (cancelled) return
+      ctx = new AudioContext()
+      const src = ctx.createMediaStreamSource(stream)
+      const an = ctx.createAnalyser()
+      an.fftSize = 2048
+      src.connect(an)
+      const detector = PitchDetector.forFloat32Array(an.fftSize)
+      const buf = new Float32Array(an.fftSize)
+      timer = setTimeout(() => finish(false), TIMEOUT_MS)
+      setState('listening')
+
+      const loop = () => {
+        if (cancelled || doneRef.current) return
+        an.getFloatTimeDomainData(buf)
+        const [freq, clarity] = detector.findPitch(buf, ctx!.sampleRate)
+        if (clarity > CLARITY && freq > 50 && freq < 1200) {
+          const m = midiOfFreq(freq)
+          setHeard(Math.round(m))
+          const diff = (((m - target) % 12) + 18) % 12 - 6 // 折叠到 ±6 半音
+          if (Math.abs(diff) <= TOL) {
+            streak++
+            if (streak >= NEED_FRAMES) {
+              finish(true)
+              return
+            }
+          } else {
+            streak = 0
+          }
+        } else {
+          streak = 0
+        }
+        raf = requestAnimationFrame(loop)
+      }
+      raf = requestAnimationFrame(loop)
     }
-    void boot()
+    void run()
 
     return () => {
-      alive = false
+      cancelled = true
       cancelAnimationFrame(raf)
-      window.clearTimeout(timer)
+      if (timer) clearTimeout(timer)
       stream?.getTracks().forEach(t => t.stop())
-      if (ctx) void ctx.close()
+      void ctx?.close().catch(() => undefined)
     }
-  }, [target])
-
-  const pct = Math.min(100, Math.round((frames / NEED_FRAMES) * 100))
+  }, [target, ghostMic])
 
   return (
     <div className="singPanel">
-      <div className="singTarget">
-        请唱：<b>{nameOf(target)}</b>（{solfegeOf(target)}）
-      </div>
-      <div className="singHeard">
-        {heard ? `听到：${heard}` : '唱出这个音，保持稳定……'}
-        {cents !== null && <span className="singCents">{cents > 0 ? `+${cents}` : cents} 音分</span>}
-      </div>
-      <div className="singBar">
-        <div className="singBarFill" style={{ width: pct + '%' }} />
-      </div>
-      {frames > 0 && <div className="singGood">很好，保持住这个音！</div>}
-      {failed && (
-        <button className="ghostMic" onClick={() => skipRef.current()}>
-          麦克风用不了？先跳过，以后再唱
-        </button>
-      )}
+      <div className="singTarget">请唱：{displayName(target)}</div>
+      <div className={'singDot ' + state}>{state === 'listening' ? '正在听…' : state === 'done' ? '完成' : '准备中…'}</div>
+      {heard !== null && <div className="singHeard">听到：{displayName(heard)}</div>}
     </div>
   )
 }
