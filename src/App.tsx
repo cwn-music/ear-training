@@ -73,6 +73,7 @@ export default function App() {
   const [singing, setSinging] = useState(false)
   const [placementStage, setPlacementStage] = useState(0)
   const [placementHit, setPlacementHit] = useState(0)
+  const [zooming, setZooming] = useState(false)
   const audioReady = useRef(false)
 
   const q = questions[qi]
@@ -340,12 +341,25 @@ export default function App() {
     advance(true, score)
   }
 
+  // 点击封面：放大海螺 → 进入学习地图
+  const enterFromCover = () => {
+    if (zooming) return
+    warmup()
+    setZooming(true)
+    window.setTimeout(() => {
+      setZooming(false)
+      setPhase('map')
+    }, 1150)
+  }
+
   // —— 渲染 ——
   const home = (
-    <div className="homePage">
-      <img className="hero" src="/hero.png" alt="缪斯 Muse" />
-      <h1>缪斯 Muse</h1>
-      <p className="subtitle">视唱练耳 · 每天十分钟</p>
+    <div className={'homePage' + (zooming ? ' zooming' : '')}>
+      <button className="coverBtn" onClick={enterFromCover} aria-label="轻点海螺，进入学习">
+        <img className="hero cover" src="/muse.png" alt="缪斯 Muse" />
+        <span className="conchRipple" aria-hidden="true" />
+        <span className="coverHint">轻点海螺 · 进入学习</span>
+      </button>
       {maxUnlocked > 1 ? (
         <button className="btn primary big" onClick={() => { warmup(); setPhase('map') }}>
           继续学习 · 第 {maxUnlocked} 课
@@ -361,6 +375,7 @@ export default function App() {
         </>
       )}
       {streak.count > 0 && <p className="streakLine">已连续打卡 {streak.count} 天</p>}
+      <div className="zoomFade" aria-hidden="true" />
     </div>
   )
 
@@ -414,7 +429,7 @@ export default function App() {
           )}
           {q.kind === 'pitch' && q.keys && (
             <div className="staffBox">
-              <Piano highlight={[q.midi]} />
+              <Piano highlight={[q.midi]} label={false} />
             </div>
           )}
 
