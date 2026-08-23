@@ -91,13 +91,14 @@ h1, h2, h3 { font-weight: 600; color: var(--slate); }
 .coverFrame {
   position: relative;
   display: inline-block;
-  max-width: 100%;
+  width: min(100%, 62vh); /* 尺寸只由 CSS 决定：图片未加载完涟漪也在正确位置 */
+  aspect-ratio: 1 / 1;
 }
 .hero.cover {
   display: block;
-  width: auto;
-  max-width: 100%;
-  max-height: 62vh; /* 适配不同屏幕：窗口越高图越大，矮窗口自动缩小 */
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
   transition: transform 1.05s cubic-bezier(0.55, 0.12, 0.35, 1);
   transform-origin: 45% 20.5%; /* 海螺在画面中的位置 */
   will-change: transform;
