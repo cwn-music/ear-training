@@ -37,8 +37,8 @@ export const LESSONS: Lesson[] = [
 export const lessonOf = (id: number) => LESSONS.find(l => l.id === id)!
 
 export const INSTRUMENTS = [
-  { id: 'piano', name: '钢琴', desc: '音域宽广，力度层次丰富，可同时在多个音区演奏。', img: '/instruments/piano.png' },
-  { id: 'violin', name: '小提琴', desc: '四根弦从低到高依次是 sol、re、la、mi，音色接近人声。', img: '/instruments/violin.png' },
-  { id: 'flute', name: '长笛', desc: '木管乐器，靠气流在管内振动发声，音色清澈透明。', img: '/instruments/flute.png' },
-  { id: 'trumpet', name: '小号', desc: '铜管乐器，靠嘴唇振动发声，音色明亮有力。', img: '/instruments/trumpet.png' },
+  { id: 'piano', name: '钢琴', desc: '音域宽广，力度层次丰富，可同时在多个音区演奏。', img: '/instruments/piano.webp' },
+  { id: 'violin', name: '小提琴', desc: '四根弦从低到高依次是 sol、re、la、mi，音色接近人声。', img: '/instruments/violin.webp' },
+  { id: 'flute', name: '长笛', desc: '木管乐器，靠气流在管内振动发声，音色清澈透明。', img: '/instruments/flute.webp' },
+  { id: 'trumpet', name: '小号', desc: '铜管乐器，靠嘴唇振动发声，音色明亮有力。', img: '/instruments/trumpet.webp' },
 ] as const

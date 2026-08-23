@@ -357,7 +357,7 @@ export default function App() {
     <div className={'homePage' + (zooming ? ' zooming' : '')}>
       <button className="coverBtn" onClick={enterFromCover} aria-label="轻点海螺，进入学习">
         <span className="coverFrame">
-          <img className="hero cover" src="/muse.png" alt="缪斯 Muse" />
+          <img className="hero cover" src="/muse.webp" alt="缪斯 Muse" />
           <span className="conchRipple" aria-hidden="true" />
           <span className="coverHint">轻点海螺 · 进入学习</span>
         </span>
@@ -392,7 +392,7 @@ export default function App() {
       <h2>学习地图</h2>
       {UNITS.map(u => (
         <div key={u.id} className="unitBlock">
-          <img className="unitCover" src={`/covers/unit${u.id}.png`} alt={u.name} />
+          <img className="unitCover" src={`/covers/unit${u.id}.webp`} alt={u.name} />
           <h3>{u.name}</h3>
           <div className="lessonGrid">
             {u.lessonIds.map(id => {
