@@ -341,10 +341,13 @@ export default function App() {
     advance(true, score)
   }
 
-  // 点击封面：放大海螺 → 进入学习地图
+  // 点击封面：海螺海浪声 + 放大海螺 → 进入学习地图
   const enterFromCover = () => {
     if (zooming) return
     warmup()
+    const sea = new Audio('/conch.mp3')
+    sea.volume = 0.7
+    void sea.play().catch(() => {})
     setZooming(true)
     window.setTimeout(() => {
       setZooming(false)
@@ -362,25 +365,9 @@ export default function App() {
           <span className="coverHint">轻点海螺 · 进入学习</span>
         </span>
       </button>
-      {maxUnlocked > 1 ? (
-        <>
-          <button className="btn primary big" onClick={() => { warmup(); setPhase('map') }}>
-            继续学习 · 第 {maxUnlocked} 课
-          </button>
-          <button className="btn ghost" onClick={() => { warmup(); startPlacement() }}>
-            重新定级测试
-          </button>
-        </>
-      ) : (
-        <>
-          <button className="btn primary big" onClick={() => { warmup(); startPlacement() }}>
-            开始定级测试
-          </button>
-          <button className="btn ghost" onClick={() => { warmup(); setMaxUnlocked(1); setPhase('map') }}>
-            从第 1 课开始
-          </button>
-        </>
-      )}
+      <button className="placementLink" onClick={() => { warmup(); startPlacement() }}>
+        {maxUnlocked > 1 ? '重新定级测试' : '先做定级测试 · 跳过已会的内容'}
+      </button>
       {streak.count > 0 && <p className="streakLine">已连续打卡 {streak.count} 天</p>}
       <div className="zoomFade" aria-hidden="true" />
     </div>

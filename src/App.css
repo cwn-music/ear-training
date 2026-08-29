@@ -164,7 +164,25 @@ h1, h2, h3 { font-weight: 600; color: var(--slate); }
 .homePage.zooming .conchRipple,
 .homePage.zooming .coverHint { animation: none; opacity: 0; transition: opacity 0.25s; }
 .homePage.zooming .btn,
+.homePage.zooming .placementLink,
 .homePage.zooming .streakLine { opacity: 0; transition: opacity 0.3s; }
+
+/* 首页角落里的定级测试小链接：不抢眼，但找得到 */
+.placementLink {
+  display: inline-block;
+  background: none;
+  border: none;
+  padding: 6px 10px;
+  font-family: inherit;
+  font-size: 13px;
+  color: #a8956f;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  cursor: pointer;
+  opacity: 0.85;
+  transition: opacity 0.15s;
+}
+.placementLink:hover { opacity: 1; }
 
 /* —— 地图 —— */
 .unitBlock { margin-bottom: 26px; }
