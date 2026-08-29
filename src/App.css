@@ -80,7 +80,9 @@ h1, h2, h3 { font-weight: 600; color: var(--slate); }
 /* 封面：轻点海螺进入 */
 .coverBtn {
   display: block;
-  width: 100%;
+  /* 破窗：封面可以比 560px 内容栏更宽，大屏上不再显小；居中于视口 */
+  width: min(100vw - 32px, 860px);
+  margin-left: calc(50% - min(50vw - 16px, 430px));
   padding: 0;
   border: none;
   background: none;
@@ -91,8 +93,8 @@ h1, h2, h3 { font-weight: 600; color: var(--slate); }
 .coverFrame {
   position: relative;
   display: inline-block;
-  width: min(100%, 62vh); /* 尺寸只由 CSS 决定：图片未加载完涟漪也在正确位置 */
-  aspect-ratio: 1 / 1;
+  width: min(100%, 68vh); /* 随屏幕高度缩放，且图片未加载完涟漪也在正确位置 */
+  aspect-ratio: 1 / 1; /* 与原图一致：完整显示，不裁切 */
 }
 .hero.cover {
   display: block;
