@@ -27,6 +27,8 @@
 body {
   margin: 0;
   font-family: 'MuseCustom', 'Noto Serif SC', 'Songti SC', serif;
+  font-size: 18px;
+  line-height: 1.75;
   background: var(--paper);
   color: var(--ink);
   -webkit-font-smoothing: antialiased;
@@ -48,7 +50,7 @@ h1, h2, h3 { font-weight: 600; color: var(--slate); }
   background: transparent;
   color: var(--slate);
   font-family: inherit;
-  font-size: 16px;
+  font-size: 18px;
   padding: 10px 22px;
   border-radius: 10px;
   cursor: pointer;
@@ -62,16 +64,16 @@ h1, h2, h3 { font-weight: 600; color: var(--slate); }
   color: #fff;
 }
 .btn.primary:hover { background: #25304a; }
-.btn.big { font-size: 18px; padding: 14px 34px; display: block; width: 100%; margin: 10px 0; }
+.btn.big { font-size: 20px; padding: 14px 34px; display: block; width: 100%; margin: 10px 0; }
 .btn.ghost { border-color: var(--kraft); }
-.btn.small { font-size: 13px; padding: 6px 12px; }
+.btn.small { font-size: 14.5px; padding: 6px 12px; }
 
 .backLink {
   background: none;
   border: none;
   color: var(--slate);
   font-family: inherit;
-  font-size: 14px;
+  font-size: 15.5px;
   cursor: pointer;
   padding: 6px 0;
   margin-bottom: 6px;
@@ -85,7 +87,7 @@ h1, h2, h3 { font-weight: 600; color: var(--slate); }
   border: 1px solid var(--kraft);
   box-shadow: 0 4px 18px rgba(51, 65, 92, 0.12);
 }
-.streakLine { color: var(--gold); font-size: 14px; margin-top: 14px; }
+.streakLine { color: var(--gold); font-size: 15.5px; margin-top: 14px; }
 
 /* 封面：轻点海螺进入 */
 .coverBtn {
@@ -148,7 +150,7 @@ h1, h2, h3 { font-weight: 600; color: var(--slate); }
   border: 1px solid var(--kraft);
   border-radius: 999px;
   padding: 7px 16px;
-  font-size: 14px;
+  font-size: 15.5px;
   letter-spacing: 1px;
   white-space: nowrap;
   box-shadow: 0 2px 10px rgba(51, 65, 92, 0.15);
@@ -184,7 +186,7 @@ h1, h2, h3 { font-weight: 600; color: var(--slate); }
   border: none;
   padding: 6px 10px;
   font-family: inherit;
-  font-size: 13px;
+  font-size: 14.5px;
   color: #a8956f;
   text-decoration: underline;
   text-underline-offset: 4px;
@@ -204,13 +206,13 @@ h1, h2, h3 { font-weight: 600; color: var(--slate); }
   padding: 14px;
   text-align: left;
 }
-.syncTip { font-size: 13px; color: #6b7280; margin: 8px 0 6px; }
+.syncTip { font-size: 14.5px; color: #6b7280; margin: 8px 0 6px; }
 .syncRow { display: flex; gap: 8px; align-items: center; }
 .syncRow input {
   flex: 1;
   min-width: 0;
   font-family: inherit;
-  font-size: 13px;
+  font-size: 14.5px;
   padding: 8px 10px;
   border: 1px solid var(--kraft);
   border-radius: 8px;
@@ -228,7 +230,7 @@ h1, h2, h3 { font-weight: 600; color: var(--slate); }
 }
 .unitBlock h3 {
   margin: 6px 0 10px;
-  font-size: 17px;
+  font-size: 19px;
   border-bottom: 1px solid var(--kraft);
   padding-bottom: 6px;
 }
@@ -243,7 +245,7 @@ h1, h2, h3 { font-weight: 600; color: var(--slate); }
   background: #fff;
   cursor: pointer;
   font-family: inherit;
-  font-size: 15px;
+  font-size: 17px;
   text-align: left;
   transition: all 0.15s;
 }
@@ -255,14 +257,14 @@ h1, h2, h3 { font-weight: 600; color: var(--slate); }
   border-radius: 50%;
   border: 1.5px solid var(--slate);
   display: flex; align-items: center; justify-content: center;
-  font-size: 14px;
+  font-size: 15.5px;
   flex-shrink: 0;
 }
 .lessonNode.done .lessonNum { background: var(--gold-soft); border-color: var(--gold); }
 
 /* —— 学习页 —— */
 .learnPage h2 { margin: 4px 0; }
-.goal { color: #6b7280; font-size: 14px; margin-top: 4px; }
+.goal { color: #6b7280; font-size: 15.5px; margin-top: 4px; }
 .learnCard {
   background: #fff;
   border: 1px solid var(--kraft);
@@ -270,9 +272,9 @@ h1, h2, h3 { font-weight: 600; color: var(--slate); }
   padding: 16px 18px;
   margin: 14px 0;
 }
-.learnCard h3 { margin: 0 0 8px; font-size: 16px; }
-.learnBody p { margin: 8px 0; line-height: 1.7; font-size: 15px; }
-.learnBody .tip { font-size: 13px; color: #6b7280; }
+.learnCard h3 { margin: 0 0 8px; font-size: 18px; }
+.learnBody p { margin: 8px 0; line-height: 1.7; font-size: 17px; }
+.learnBody .tip { font-size: 14.5px; color: #6b7280; }
 .intervalRow {
   display: flex;
   align-items: center;
@@ -282,7 +284,7 @@ h1, h2, h3 { font-weight: 600; color: var(--slate); }
   border-top: 1px dashed var(--kraft);
 }
 .intervalName { font-weight: 600; min-width: 64px; }
-.intervalDesc { font-size: 13px; color: #6b7280; flex: 1; min-width: 120px; }
+.intervalDesc { font-size: 14.5px; color: #6b7280; flex: 1; min-width: 120px; }
 .instGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .instCard {
   border: 1px solid var(--kraft);
@@ -292,13 +294,13 @@ h1, h2, h3 { font-weight: 600; color: var(--slate); }
 }
 .instCard img { width: 100%; border-radius: 8px; }
 .instName { font-weight: 600; margin: 6px 0 2px; }
-.instDesc { font-size: 12px; color: #6b7280; margin-bottom: 8px; line-height: 1.5; }
+.instDesc { font-size: 14px; color: #6b7280; margin-bottom: 8px; line-height: 1.5; }
 
 /* —— 答题页 —— */
 .quizTop {
   display: flex;
   justify-content: space-between;
-  font-size: 14px;
+  font-size: 15.5px;
   color: #6b7280;
 }
 .progressBar {
@@ -313,7 +315,7 @@ h1, h2, h3 { font-weight: 600; color: var(--slate); }
   background: var(--gold);
   transition: width 0.3s;
 }
-.prompt { font-size: 20px; margin: 8px 0 14px; }
+.prompt { font-size: 22px; margin: 8px 0 14px; }
 .staffBox {
   background: #fff;
   border: 1px solid var(--kraft);
@@ -337,7 +339,7 @@ h1, h2, h3 { font-weight: 600; color: var(--slate); }
   background: #fff;
   padding: 14px 10px;
   font-family: inherit;
-  font-size: 16px;
+  font-size: 18px;
   cursor: pointer;
   transition: all 0.15s;
 }
@@ -348,7 +350,7 @@ h1, h2, h3 { font-weight: 600; color: var(--slate); }
   margin-top: 14px;
   padding: 12px 14px;
   border-radius: 10px;
-  font-size: 15px;
+  font-size: 17px;
 }
 .feedback.ok { background: #eef7ec; color: #2c662d; }
 .feedback.no { background: #fbecec; color: #8a2724; }
@@ -362,11 +364,11 @@ h1, h2, h3 { font-weight: 600; color: var(--slate); }
   padding: 18px;
   margin: 12px 0;
 }
-.singTarget { font-size: 22px; font-weight: 600; color: var(--slate); }
-.singDot { margin: 10px 0; font-size: 14px; color: #6b7280; }
+.singTarget { font-size: 24px; font-weight: 600; color: var(--slate); }
+.singDot { margin: 10px 0; font-size: 15.5px; color: #6b7280; }
 .singDot.listening { color: var(--blue); }
 .singDot.done { color: var(--green); }
-.singHeard { font-size: 14px; color: #6b7280; }
+.singHeard { font-size: 15.5px; color: #6b7280; }
 
 /* —— 结算 —— */
 .donePage { text-align: center; padding-top: 40px; }
@@ -412,7 +414,7 @@ h1, h2, h3 { font-weight: 600; color: var(--slate); }
   bottom: 5px;
   left: 0; right: 0;
   text-align: center;
-  font-size: 12px;
+  font-size: 14px;
   color: var(--slate);
   line-height: 1.25;
   pointer-events: none;
@@ -420,7 +422,7 @@ h1, h2, h3 { font-weight: 600; color: var(--slate); }
 .pianoKeyLabel small {
   display: block;
   color: #8a94a6;
-  font-size: 10px;
+  font-size: 12px;
 }
 .pianoMark {
   position: absolute;
@@ -431,7 +433,7 @@ h1, h2, h3 { font-weight: 600; color: var(--slate); }
   color: #fff;
   border-radius: 50%;
   width: 20px; height: 20px;
-  font-size: 12px;
+  font-size: 14px;
   display: flex;
   align-items: center;
   justify-content: center;
