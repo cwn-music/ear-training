@@ -74,6 +74,9 @@ export default function App() {
   const [placementStage, setPlacementStage] = useState(0)
   const [placementHit, setPlacementHit] = useState(0)
   const [zooming, setZooming] = useState(false)
+  const [syncOpen, setSyncOpen] = useState(false)
+  const [syncIn, setSyncIn] = useState('')
+  const [copied, setCopied] = useState(false)
   const audioReady = useRef(false)
 
   const q = questions[qi]
@@ -341,18 +344,50 @@ export default function App() {
     advance(true, score)
   }
 
-  // 点击封面：海螺海浪声 + 放大海螺 → 进入学习地图
+  // 点击封面：放大海螺 → 进入学习地图
   const enterFromCover = () => {
     if (zooming) return
     warmup()
-    const sea = new Audio('/conch.mp3')
-    sea.volume = 0.7
-    void sea.play().catch(() => {})
     setZooming(true)
     window.setTimeout(() => {
       setZooming(false)
       setPhase('map')
     }, 1150)
+  }
+
+  // —— 多设备进度同步：导出/导入同步码 ——
+  const syncCode = () => {
+    try {
+      return btoa(JSON.stringify({ p: maxUnlocked, s: streak, w: wrongBook }))
+    } catch {
+      return ''
+    }
+  }
+
+  const copySyncCode = () => {
+    const code = syncCode()
+    const done = () => {
+      setCopied(true)
+      window.setTimeout(() => setCopied(false), 2000)
+    }
+    if (navigator.clipboard) {
+      void navigator.clipboard.writeText(code).then(done).catch(done)
+    } else {
+      done()
+    }
+  }
+
+  const importSync = () => {
+    try {
+      const d = JSON.parse(atob(syncIn.trim())) as { p?: number; s?: { count: number; last: string }; w?: Record<string, number> }
+      if (typeof d.p !== 'number' || d.p < 1 || d.p > 999) throw new Error('bad')
+      localStorage.setItem(P_PROGRESS, JSON.stringify(Math.round(d.p)))
+      localStorage.setItem(P_STREAK, JSON.stringify(d.s ?? { count: 0, last: '' }))
+      localStorage.setItem(P_WRONG, JSON.stringify(d.w ?? {}))
+      location.reload()
+    } catch {
+      window.alert('同步码无效，请检查后重试')
+    }
   }
 
   // —— 渲染 ——
@@ -400,6 +435,26 @@ export default function App() {
           </div>
         </div>
       ))}
+
+      <div className="syncBox">
+        <button className="placementLink" onClick={() => setSyncOpen(!syncOpen)}>
+          {syncOpen ? '收起进度同步' : '进度同步 · 两台设备'}
+        </button>
+        {syncOpen && (
+          <div className="syncPanel">
+            <p className="syncTip">把这台设备的进度带到另一台：复制同步码</p>
+            <div className="syncRow">
+              <input readOnly value={syncCode()} onFocus={e => e.target.select()} />
+              <button className="btn ghost small" onClick={copySyncCode}>{copied ? '已复制 ✓' : '复制'}</button>
+            </div>
+            <p className="syncTip">从另一台设备恢复进度到这里：</p>
+            <div className="syncRow">
+              <input placeholder="粘贴同步码" value={syncIn} onChange={e => setSyncIn(e.target.value)} />
+              <button className="btn ghost small" onClick={importSync}>恢复</button>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   )
 

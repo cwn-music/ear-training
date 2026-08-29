@@ -14,9 +14,19 @@
 
 * { box-sizing: border-box; }
 
+/* 自定义字体：把字体文件放进 public/fonts/ 即可生效
+   支持三种文件名（放任意一个就行）：main.woff2 / main.ttf / main.otf */
+@font-face {
+  font-family: 'MuseCustom';
+  src: url('/fonts/main.woff2') format('woff2'),
+       url('/fonts/main.ttf') format('truetype'),
+       url('/fonts/main.otf') format('opentype');
+  font-display: swap; /* 字体加载期间先用系统字体，加载完自动切换 */
+}
+
 body {
   margin: 0;
-  font-family: 'Noto Serif SC', 'Songti SC', serif;
+  font-family: 'MuseCustom', 'Noto Serif SC', 'Songti SC', serif;
   background: var(--paper);
   color: var(--ink);
   -webkit-font-smoothing: antialiased;
@@ -183,6 +193,30 @@ h1, h2, h3 { font-weight: 600; color: var(--slate); }
   transition: opacity 0.15s;
 }
 .placementLink:hover { opacity: 1; }
+
+/* 进度同步面板 */
+.syncBox { margin-top: 8px; text-align: center; }
+.syncPanel {
+  margin-top: 10px;
+  border: 1px solid var(--kraft);
+  border-radius: 12px;
+  background: var(--paper2);
+  padding: 14px;
+  text-align: left;
+}
+.syncTip { font-size: 13px; color: #6b7280; margin: 8px 0 6px; }
+.syncRow { display: flex; gap: 8px; align-items: center; }
+.syncRow input {
+  flex: 1;
+  min-width: 0;
+  font-family: inherit;
+  font-size: 13px;
+  padding: 8px 10px;
+  border: 1px solid var(--kraft);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--ink);
+}
 
 /* —— 地图 —— */
 .unitBlock { margin-bottom: 26px; }
