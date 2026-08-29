@@ -456,8 +456,10 @@ h1, h2, h3 { font-weight: 600; color: var(--slate); }
 @media (max-width: 640px) {
   .coverFrame {
     width: 100%;
-    height: 62vh;
-    height: 62dvh;
+    /* 撑满整屏：可用高度减去顶距/按钮/底距等约 200px，各种机型留白一致 */
+    height: calc(100vh - 200px);
+    height: calc(100dvh - 200px);
+    min-height: 360px;
     aspect-ratio: auto;
     overflow: hidden;
     border-radius: 14px;
