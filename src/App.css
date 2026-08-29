@@ -14,6 +14,11 @@
 
 * { box-sizing: border-box; }
 
+/* 字号随屏幕宽度自适应：手机 16px，Mac 约 18.7px，1920 大屏 19.5px，封顶 20px */
+html {
+  font-size: clamp(16px, 0.2vw + 15.7px, 20px);
+}
+
 /* 自定义字体：把字体文件放进 public/fonts/ 即可生效
    支持三种文件名（放任意一个就行）：main.woff2 / main.ttf / main.otf */
 @font-face {
@@ -27,7 +32,7 @@
 body {
   margin: 0;
   font-family: 'MuseCustom', 'Noto Serif SC', 'Songti SC', serif;
-  font-size: 18px;
+  font-size: 1.125rem;
   line-height: 1.75;
   background: var(--paper);
   color: var(--ink);
@@ -50,7 +55,7 @@ h1, h2, h3 { font-weight: 600; color: var(--slate); }
   background: transparent;
   color: var(--slate);
   font-family: inherit;
-  font-size: 18px;
+  font-size: 1.125rem;
   padding: 10px 22px;
   border-radius: 10px;
   cursor: pointer;
@@ -64,16 +69,16 @@ h1, h2, h3 { font-weight: 600; color: var(--slate); }
   color: #fff;
 }
 .btn.primary:hover { background: #25304a; }
-.btn.big { font-size: 20px; padding: 14px 34px; display: block; width: 100%; margin: 10px 0; }
+.btn.big { font-size: 1.25rem; padding: 14px 34px; display: block; width: 100%; margin: 10px 0; }
 .btn.ghost { border-color: var(--kraft); }
-.btn.small { font-size: 14.5px; padding: 6px 12px; }
+.btn.small { font-size: 0.90625rem; padding: 6px 12px; }
 
 .backLink {
   background: none;
   border: none;
   color: var(--slate);
   font-family: inherit;
-  font-size: 15.5px;
+  font-size: 0.96875rem;
   cursor: pointer;
   padding: 6px 0;
   margin-bottom: 6px;
@@ -87,7 +92,7 @@ h1, h2, h3 { font-weight: 600; color: var(--slate); }
   border: 1px solid var(--kraft);
   box-shadow: 0 4px 18px rgba(51, 65, 92, 0.12);
 }
-.streakLine { color: var(--gold); font-size: 15.5px; margin-top: 14px; }
+.streakLine { color: var(--gold); font-size: 0.96875rem; margin-top: 14px; }
 
 /* 封面：轻点海螺进入 */
 .coverBtn {
@@ -108,6 +113,8 @@ h1, h2, h3 { font-weight: 600; color: var(--slate); }
   width: min(100%, 80vh); /* 随屏幕高度缩放，且图片未加载完涟漪也在正确位置 */
   aspect-ratio: 1 / 1; /* 与原图一致：完整显示，不裁切 */
 }
+/* 图片盒：始终等于图片实际显示大小（正方形），涟漪与缩放锚点以它为基准 */
+.coverImgBox { position: relative; display: block; width: 100%; height: 100%; }
 .hero.cover {
   display: block;
   width: 100%;
@@ -150,7 +157,7 @@ h1, h2, h3 { font-weight: 600; color: var(--slate); }
   border: 1px solid var(--kraft);
   border-radius: 999px;
   padding: 7px 16px;
-  font-size: 15.5px;
+  font-size: 0.96875rem;
   letter-spacing: 1px;
   white-space: nowrap;
   box-shadow: 0 2px 10px rgba(51, 65, 92, 0.15);
@@ -186,7 +193,7 @@ h1, h2, h3 { font-weight: 600; color: var(--slate); }
   border: none;
   padding: 6px 10px;
   font-family: inherit;
-  font-size: 14.5px;
+  font-size: 0.90625rem;
   color: #a8956f;
   text-decoration: underline;
   text-underline-offset: 4px;
@@ -206,13 +213,13 @@ h1, h2, h3 { font-weight: 600; color: var(--slate); }
   padding: 14px;
   text-align: left;
 }
-.syncTip { font-size: 14.5px; color: #6b7280; margin: 8px 0 6px; }
+.syncTip { font-size: 0.90625rem; color: #6b7280; margin: 8px 0 6px; }
 .syncRow { display: flex; gap: 8px; align-items: center; }
 .syncRow input {
   flex: 1;
   min-width: 0;
   font-family: inherit;
-  font-size: 14.5px;
+  font-size: 0.90625rem;
   padding: 8px 10px;
   border: 1px solid var(--kraft);
   border-radius: 8px;
@@ -230,7 +237,7 @@ h1, h2, h3 { font-weight: 600; color: var(--slate); }
 }
 .unitBlock h3 {
   margin: 6px 0 10px;
-  font-size: 19px;
+  font-size: 1.1875rem;
   border-bottom: 1px solid var(--kraft);
   padding-bottom: 6px;
 }
@@ -245,7 +252,7 @@ h1, h2, h3 { font-weight: 600; color: var(--slate); }
   background: #fff;
   cursor: pointer;
   font-family: inherit;
-  font-size: 17px;
+  font-size: 1.0625rem;
   text-align: left;
   transition: all 0.15s;
 }
@@ -257,14 +264,14 @@ h1, h2, h3 { font-weight: 600; color: var(--slate); }
   border-radius: 50%;
   border: 1.5px solid var(--slate);
   display: flex; align-items: center; justify-content: center;
-  font-size: 15.5px;
+  font-size: 0.96875rem;
   flex-shrink: 0;
 }
 .lessonNode.done .lessonNum { background: var(--gold-soft); border-color: var(--gold); }
 
 /* —— 学习页 —— */
 .learnPage h2 { margin: 4px 0; }
-.goal { color: #6b7280; font-size: 15.5px; margin-top: 4px; }
+.goal { color: #6b7280; font-size: 0.96875rem; margin-top: 4px; }
 .learnCard {
   background: #fff;
   border: 1px solid var(--kraft);
@@ -272,9 +279,9 @@ h1, h2, h3 { font-weight: 600; color: var(--slate); }
   padding: 16px 18px;
   margin: 14px 0;
 }
-.learnCard h3 { margin: 0 0 8px; font-size: 18px; }
-.learnBody p { margin: 8px 0; line-height: 1.7; font-size: 17px; }
-.learnBody .tip { font-size: 14.5px; color: #6b7280; }
+.learnCard h3 { margin: 0 0 8px; font-size: 1.125rem; }
+.learnBody p { margin: 8px 0; line-height: 1.7; font-size: 1.0625rem; }
+.learnBody .tip { font-size: 0.90625rem; color: #6b7280; }
 .intervalRow {
   display: flex;
   align-items: center;
@@ -284,7 +291,7 @@ h1, h2, h3 { font-weight: 600; color: var(--slate); }
   border-top: 1px dashed var(--kraft);
 }
 .intervalName { font-weight: 600; min-width: 64px; }
-.intervalDesc { font-size: 14.5px; color: #6b7280; flex: 1; min-width: 120px; }
+.intervalDesc { font-size: 0.90625rem; color: #6b7280; flex: 1; min-width: 120px; }
 .instGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .instCard {
   border: 1px solid var(--kraft);
@@ -294,13 +301,13 @@ h1, h2, h3 { font-weight: 600; color: var(--slate); }
 }
 .instCard img { width: 100%; border-radius: 8px; }
 .instName { font-weight: 600; margin: 6px 0 2px; }
-.instDesc { font-size: 14px; color: #6b7280; margin-bottom: 8px; line-height: 1.5; }
+.instDesc { font-size: 0.875rem; color: #6b7280; margin-bottom: 8px; line-height: 1.5; }
 
 /* —— 答题页 —— */
 .quizTop {
   display: flex;
   justify-content: space-between;
-  font-size: 15.5px;
+  font-size: 0.96875rem;
   color: #6b7280;
 }
 .progressBar {
@@ -315,7 +322,7 @@ h1, h2, h3 { font-weight: 600; color: var(--slate); }
   background: var(--gold);
   transition: width 0.3s;
 }
-.prompt { font-size: 22px; margin: 8px 0 14px; }
+.prompt { font-size: 1.375rem; margin: 8px 0 14px; }
 .staffBox {
   background: #fff;
   border: 1px solid var(--kraft);
@@ -339,7 +346,7 @@ h1, h2, h3 { font-weight: 600; color: var(--slate); }
   background: #fff;
   padding: 14px 10px;
   font-family: inherit;
-  font-size: 18px;
+  font-size: 1.125rem;
   cursor: pointer;
   transition: all 0.15s;
 }
@@ -350,7 +357,7 @@ h1, h2, h3 { font-weight: 600; color: var(--slate); }
   margin-top: 14px;
   padding: 12px 14px;
   border-radius: 10px;
-  font-size: 17px;
+  font-size: 1.0625rem;
 }
 .feedback.ok { background: #eef7ec; color: #2c662d; }
 .feedback.no { background: #fbecec; color: #8a2724; }
@@ -364,15 +371,15 @@ h1, h2, h3 { font-weight: 600; color: var(--slate); }
   padding: 18px;
   margin: 12px 0;
 }
-.singTarget { font-size: 24px; font-weight: 600; color: var(--slate); }
-.singDot { margin: 10px 0; font-size: 15.5px; color: #6b7280; }
+.singTarget { font-size: 1.5rem; font-weight: 600; color: var(--slate); }
+.singDot { margin: 10px 0; font-size: 0.96875rem; color: #6b7280; }
 .singDot.listening { color: var(--blue); }
 .singDot.done { color: var(--green); }
-.singHeard { font-size: 15.5px; color: #6b7280; }
+.singHeard { font-size: 0.96875rem; color: #6b7280; }
 
 /* —— 结算 —— */
 .donePage { text-align: center; padding-top: 40px; }
-.scoreLine { font-size: 40px; font-weight: 700; color: var(--slate); margin: 10px 0; }
+.scoreLine { font-size: 2.5rem; font-weight: 700; color: var(--slate); margin: 10px 0; }
 .doneBtns { margin-top: 22px; display: flex; flex-direction: column; align-items: center; gap: 6px; }
 .doneBtns .btn { width: 100%; max-width: 300px; }
 
@@ -414,7 +421,7 @@ h1, h2, h3 { font-weight: 600; color: var(--slate); }
   bottom: 5px;
   left: 0; right: 0;
   text-align: center;
-  font-size: 14px;
+  font-size: 0.875rem;
   color: var(--slate);
   line-height: 1.25;
   pointer-events: none;
@@ -422,7 +429,7 @@ h1, h2, h3 { font-weight: 600; color: var(--slate); }
 .pianoKeyLabel small {
   display: block;
   color: #8a94a6;
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 .pianoMark {
   position: absolute;
@@ -433,7 +440,7 @@ h1, h2, h3 { font-weight: 600; color: var(--slate); }
   color: #fff;
   border-radius: 50%;
   width: 20px; height: 20px;
-  font-size: 14px;
+  font-size: 0.875rem;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -441,3 +448,23 @@ h1, h2, h3 { font-weight: 600; color: var(--slate); }
   pointer-events: none;
 }
 .pianoMark.dark { top: 38px; }
+
+/* —— 手机竖屏：封面撑高，减少上下空白 ——
+   原图为正方形，竖屏下按宽度只能显示很矮；改为固定较高的框，
+   图片保持完整高度、只裁两侧空白纸边（人物居中，头部不受影响）。
+   边框/圆角/阴影移到外框，由外框裁切溢出的图片。 */
+@media (max-width: 640px) {
+  .coverFrame {
+    width: 100%;
+    height: 62vh;
+    height: 62dvh;
+    aspect-ratio: auto;
+    overflow: hidden;
+    border-radius: 14px;
+    border: 1px solid var(--kraft);
+    box-shadow: 0 4px 18px rgba(51, 65, 92, 0.12);
+  }
+  /* 图片比框宽时需绝对居中，让两侧被均匀裁掉（margin auto 在溢出时会失效左对齐） */
+  .coverImgBox { position: absolute; left: 50%; top: 0; transform: translateX(-50%); width: auto; height: 100%; aspect-ratio: 1 / 1; }
+  .hero.cover { border: none; border-radius: 0; box-shadow: none; }
+}

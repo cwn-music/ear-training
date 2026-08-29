@@ -395,8 +395,10 @@ export default function App() {
     <div className={'homePage' + (zooming ? ' zooming' : '')}>
       <button className="coverBtn" onClick={enterFromCover} aria-label="轻点海螺，进入学习">
         <span className="coverFrame">
-          <img className="hero cover" src="/muse.webp" alt="缪斯 Muse" />
-          <span className="conchRipple" aria-hidden="true" />
+          <span className="coverImgBox">
+            <img className="hero cover" src="/muse.webp" alt="缪斯 Muse" />
+            <span className="conchRipple" aria-hidden="true" />
+          </span>
           <span className="coverHint">轻点海螺 · 进入学习</span>
         </span>
       </button>
