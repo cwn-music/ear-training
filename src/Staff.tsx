@@ -9,7 +9,7 @@ const keyOf = (midi: number) => LETTERS[midi % 12] + '/' + (Math.floor(midi / 12
 const needsAcc = (midi: number) => LETTERS[midi % 12].includes('#')
 
 interface Props {
-  clef?: Clef
+  clef?: Clef | 'none' // 'none' = 不画谱号（纯节奏谱用）
   midi?: number | null // 单音；null 表示隐藏答案（画一个空心占位符）
   midis?: number[] // 和弦/多音
   chord?: boolean
@@ -32,6 +32,13 @@ function tokNotes(tok: Tok, midi: number): StaveNote[] {
     case 'r': return [mk('qr', true)]
     case 'ee': return [mk('8'), mk('8')]
     case 'eeee': return [mk('16'), mk('16'), mk('16'), mk('16')]
+    case 'e8': return [mk('8')]
+    case 'e8.': {
+      const n = mk('8d')
+      Dot.buildAndAttach([n], { all: true })
+      return [n]
+    }
+    case 'e16': return [mk('16')]
     case 'q.': {
       const n = mk('qd')
       Dot.buildAndAttach([n], { all: true })
@@ -62,7 +69,7 @@ export default function Staff({ clef = 'treble', midi = null, midis, chord = fal
       const ctx = renderer.getContext()
       ctx.setFont('Arial', 10)
       const stave = new Stave(8, 12, width - 16)
-      stave.addClef(clef)
+      if (clef !== 'none') stave.addClef(clef)
       stave.setContext(ctx).draw()
 
       let notes: StaveNote[] = []

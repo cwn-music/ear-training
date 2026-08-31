@@ -91,6 +91,12 @@ export function playRhythm(tokens: Tok[], bpm = 72, accentBeats?: number) {
         safeTrigger(piano, midiToName(midi), beat * 0.4, now + t + beat * 0.5, vel * 0.9)
       } else if (tok === 'eeee') {
         for (let i = 0; i < 4; i++) safeTrigger(piano, midiToName(midi), beat * 0.2, now + t + beat * 0.25 * i, vel * (i === 0 ? 1 : 0.85))
+      } else if (tok === 'e8') {
+        safeTrigger(piano, midiToName(midi), beat * 0.4, now + t, vel)
+      } else if (tok === 'e8.') {
+        safeTrigger(piano, midiToName(midi), beat * 0.65, now + t, vel)
+      } else if (tok === 'e16') {
+        safeTrigger(piano, midiToName(midi), beat * 0.18, now + t, vel)
       } else {
         safeTrigger(piano, midiToName(midi), beat * Math.min(b, 2) * 0.9, now + t, vel)
       }

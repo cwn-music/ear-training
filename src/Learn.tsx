@@ -5,6 +5,7 @@ import { ensureAudio, playMelody, playRhythm, playTwo, initInstruments, playInst
 import { INTERVAL_NAMES } from './theory'
 import Staff from './Staff'
 import Piano from './Piano'
+import RhythmDict, { COMBO_ENTRIES } from './RhythmDict'
 
 interface Props {
   lessonId: number
@@ -14,7 +15,7 @@ interface Props {
 
 const INTERVAL_DESCS: Record<number, string> = {
   1: '小二度：紧挨着的两个音，最窄的距离',
-  2: '大二度：相隔一个键的距离，像台阶',
+  2: '大二度：do 到 re 的距离，像上一格台阶',
   3: '小三度：三个半音，色彩偏暗',
   4: '大三度：四个半音，色彩明亮',
   5: '纯四度：开阔而空洞',
@@ -25,6 +26,22 @@ const INTERVAL_DESCS: Record<number, string> = {
   10: '小七度：紧张，想要上行解决',
   11: '大七度：距离八度只差半步',
   12: '纯八度：同一个音的高低重复',
+}
+
+// 新题型第一次出现的课：开练前先看「怎么答题」，答错成本降为零
+const HOWTO: Record<number, string[]> = {
+  1: ['先听播放的音，同时琴键上会亮出它的位置', '在选项里点它的名字（do / re / mi）', '答错也没关系：正确答案会标绿，还会再播一遍'],
+  2: ['会先后播放两个音', '判断第二个音比第一个更高还是更低，点对应按钮', '不确定就点「再听一遍」，不限次数'],
+  3: ['会先后播放两个音', '判断第二个音更长还是更短'],
+  4: ['会先后播放两个音', '判断第二个音更响还是更轻'],
+  5: ['先看谱面上音符的位置，再听它的声音', '在选项里点它的名字', '从 do 或 sol 出发，一格一格数到它的位置'],
+  6: ['两个音会一起响起', '判断它们之间的距离（音程）是几度', '两个音隔得越远，音程越宽'],
+  8: ['会先后播放两个音', '挨着的是级进，隔得远的是跳进'],
+  9: ['听一小串音', '判断它整体往上走、往下走，还是原地不动'],
+  10: ['听一小段旋律', '选项是三小段谱子，找出和你听到的一样那段', '先听走向，再对谱子上的高高低低'],
+  11: ['听一段节奏', '选项是三行节奏谱，找出相同的一段', '问「几拍子」时，数强拍隔几拍出现一次'],
+  12: ['听一段旋律，判断是哪种乐器在演奏', '分不清就多点几次「再听一遍」，抓住乐器的「味道」'],
+  19: ['听一串音阶', '大调明亮、小调柔和，关键差别在第三个音'],
 }
 
 function Card({ title, children }: { title: string; children: ReactNode }) {
@@ -152,7 +169,8 @@ export default function Learn({ lessonId, onStart, onBack }: Props) {
         return (
           <>
             <Card title="二度 · 相邻的音">
-              <p>相邻的两个音之间叫「二度」。它们挨得很近，听起来有一点点挤。</p>
+              <p>音程，就是两个音之间的距离。两个音隔得越远，音程越宽。这个距离用「度」来数：do 挨着 re，是二度；do 到 mi 中间隔着一个音，是三度。</p>
+              <p>这一课先练最相邻的两种：小二度和大二度。点下面的按钮，听一听它们有多近：</p>
               <IntervalCard semis={1} />
               <IntervalCard semis={2} />
             </Card>
@@ -202,6 +220,11 @@ export default function Learn({ lessonId, onStart, onBack }: Props) {
       case 11:
         return (
           <>
+            <Card title="节奏符号小词典">
+              <p>题目里的节奏谱，就是由这六个符号组成的。每个符号占多长时间，看色块、听声音：</p>
+              <RhythmDict />
+              <p>休止符比较特别：它不占声音，只数拍子——到了它就安静一拍。</p>
+            </Card>
             <Card title="拍子会循环">
               <p>二拍子：强、弱，像走路。三拍子：强、弱、弱，像转圆圈。</p>
               <PlayBtn label="二拍子" onPlay={() => playRhythm(['q', 'q', 'q', 'q'], 72, 2)} />
@@ -271,6 +294,10 @@ export default function Learn({ lessonId, onStart, onBack }: Props) {
               <PlayBtn label="附点节奏" onPlay={() => playRhythm(['q.', 'ee', 'q', 'q'])} />
               <PlayBtn label="十六分" onPlay={() => playRhythm(['eeee', 'q', 'q', 'q'])} />
             </Card>
+            <Card title="节奏型小词典">
+              <p>基本符号手拉手组成常用的「节奏型」，每个都住在一拍里。它们有约定俗成的名字，看色块、听声音：</p>
+              <RhythmDict entries={COMBO_ENTRIES} />
+            </Card>
           </>
         )
       case 18:
@@ -332,6 +359,13 @@ export default function Learn({ lessonId, onStart, onBack }: Props) {
       <button className="backLink" onClick={onBack}>‹ 返回地图</button>
       <h2>第 {lesson.id} 课 · {lesson.title}</h2>
       <p className="goal">{lesson.goal}</p>
+      {HOWTO[lessonId] && (
+        <Card title="怎么答题">
+          <ol className="howtoList">
+            {HOWTO[lessonId].map(s => <li key={s}>{s}</li>)}
+          </ol>
+        </Card>
+      )}
       {renderBody()}
       <button className="btn primary big" onClick={onStart}>开始练习</button>
     </div>

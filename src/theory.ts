@@ -4,8 +4,8 @@
 export type Clef = 'treble' | 'bass'
 
 // 节奏token：q=四分 ee=两个八分 eeee=四个十六分 h=二分 q.=附点四分 r=四分休止
-export type Tok = 'q' | 'ee' | 'eeee' | 'h' | 'q.' | 'r'
-export const TOK_BEATS: Record<Tok, number> = { q: 1, ee: 1, eeee: 1, h: 2, 'q.': 1.5, r: 1 }
+export type Tok = 'q' | 'ee' | 'eeee' | 'h' | 'q.' | 'r' | 'e8' | 'e8.' | 'e16'
+export const TOK_BEATS: Record<Tok, number> = { q: 1, ee: 1, eeee: 1, h: 2, 'q.': 1.5, r: 1, e8: 0.5, 'e8.': 0.75, e16: 0.25 }
 
 export type InstId = 'piano' | 'violin' | 'flute' | 'trumpet'
 
@@ -315,15 +315,8 @@ export const LEVEL_KINDS: Record<number, Kind[]> = {
   23: ['pitchcmp', 'durcmp', 'dyncmp', 'direct', 'meter', 'interval', 'melody', 'rhythm', 'scale', 'timbre', 'sight', 'stepleap', 'pitch'],
 }
 
-export function makeQuestion(level: number, wrongBoost?: string[]): Question {
-  const kinds = LEVEL_KINDS[level] ?? ['pitch']
-  let kind: Kind
-  if (wrongBoost && wrongBoost.length > 0 && Math.random() < 0.5) {
-    const inPool = wrongBoost.filter(k => (kinds as string[]).includes(k))
-    kind = (inPool.length > 0 ? pick(inPool) : pick(kinds)) as Kind
-  } else {
-    kind = pick(kinds)
-  }
+// 按指定题型生成一题（错题重练用：只抽错题题型，生成同知识点变式题）
+export function makeQuestionOfKind(kind: Kind, level: number): Question {
   switch (kind) {
     case 'pitch': return genPitch(level)
     case 'stepleap': return genStepleap()
@@ -339,6 +332,18 @@ export function makeQuestion(level: number, wrongBoost?: string[]): Question {
     case 'direct': return genDirect(level)
     case 'meter': return genMeter()
   }
+}
+
+export function makeQuestion(level: number, wrongBoost?: string[]): Question {
+  const kinds = LEVEL_KINDS[level] ?? ['pitch']
+  let kind: Kind
+  if (wrongBoost && wrongBoost.length > 0 && Math.random() < 0.5) {
+    const inPool = wrongBoost.filter(k => (kinds as string[]).includes(k))
+    kind = (inPool.length > 0 ? pick(inPool) : pick(kinds)) as Kind
+  } else {
+    kind = pick(kinds)
+  }
+  return makeQuestionOfKind(kind, level)
 }
 
 // 大调 / 自然小调 音阶（半音步进）

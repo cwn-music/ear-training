@@ -5,8 +5,9 @@ import {
   LESSONS, UNITS, lessonOf,
 } from './lessons'
 import {
-  type Question, type DirectAns,
+  type Question, type DirectAns, type Kind,
   displayName, solfegeOf, INTERVAL_NAMES, makeQuestion, makeSightQuestion,
+  makeQuestionOfKind, LEVEL_KINDS,
   SCALE_STEPS,
 } from './theory'
 import {
@@ -56,6 +57,43 @@ function bumpWrong(book: Record<string, number>, key: string, ok: boolean) {
 const topWrongKeys = (book: Record<string, number>) =>
   Object.entries(book).sort((a, b) => b[1] - a[1]).slice(0, 12).map(([k]) => k)
 
+// —— 出题去重 ——
+// 题目签名：同签名视为「雷同题」。一套题内不与前两题同签名；多题型的课不连出 3 道同题型
+const sigOf = (q: Question): string => {
+  switch (q.kind) {
+    case 'pitch':
+    case 'sight': return `${q.kind}:${q.midi}`
+    case 'interval': return `int:${q.semis}`
+    case 'stepleap': return `sl:${q.a},${q.b}`
+    case 'melody':
+    case 'direct': return `${q.kind}:${q.notes.join(',')}`
+    case 'rhythm': return `rh:${q.tokens.join(',')}`
+    case 'meter': return `m:${q.beats}`
+    case 'scale': return `sc:${q.mode}`
+    case 'timbre': return `ti:${q.inst}`
+    case 'pitchcmp': return `pc:${q.answer}:${Math.abs(q.b - q.a)}`
+    case 'durcmp': return `dc:${q.answer}`
+    case 'dyncmp': return `dy:${q.answer}`
+  }
+}
+
+function genQuiz(lv: number, count: number, boost: string[]): Question[] {
+  const kinds = LEVEL_KINDS[lv] ?? ['pitch']
+  const qs: Question[] = []
+  for (let i = 0; i < count; i++) {
+    let cand = makeQuestion(lv, boost)
+    for (let t = 0; t < 30; t++) {
+      const dup = qs.slice(-2).some(x => sigOf(x) === sigOf(cand))
+      const kindRun3 = kinds.length > 1 && qs.length >= 2
+        && qs[qs.length - 1].kind === cand.kind && qs[qs.length - 2].kind === cand.kind
+      if (!dup && !kindRun3) break
+      cand = makeQuestion(lv, boost)
+    }
+    qs.push(cand)
+  }
+  return qs
+}
+
 // —— 定级 ——
 const PLACEMENT_LEVELS = [1, 5, 9, 14]
 const PLACEMENT_TARGETS = [0, 4, 8, 13, 16]
@@ -77,6 +115,8 @@ export default function App() {
   const [syncOpen, setSyncOpen] = useState(false)
   const [syncIn, setSyncIn] = useState('')
   const [copied, setCopied] = useState(false)
+  const [sessionLog, setSessionLog] = useState<{ q: Question; ok: boolean; picked: string }[]>([])
+  const [reviewMode, setReviewMode] = useState(false)
   const audioReady = useRef(false)
 
   const q = questions[qi]
@@ -94,14 +134,36 @@ export default function App() {
 
   const startLevel = (lv: number) => {
     setLevel(lv)
-    const boost = topWrongKeys(wrongBook)
+    setQuestions(genQuiz(lv, QUIZ_COUNT, topWrongKeys(wrongBook)))
+    setQi(0)
+    setScore(0)
+    setPicked(null)
+    setSinging(false)
+    setSessionLog([])
+    setReviewMode(false)
+    setPhase('playing')
+  }
+
+  // 只练错题：按错题本里错得最多的题型，生成同知识点的变式题（不出原题）
+  const startWrongReview = () => {
+    const keys = topWrongKeys(wrongBook)
+    if (keys.length === 0) return
     const qs: Question[] = []
-    for (let i = 0; i < QUIZ_COUNT; i++) qs.push(makeQuestion(lv, boost))
+    for (let i = 0; i < QUIZ_COUNT; i++) {
+      const kind = keys[i % keys.length] as Kind
+      let cand = makeQuestionOfKind(kind, level)
+      for (let t = 0; t < 30 && qs.slice(-2).some(x => sigOf(x) === sigOf(cand)); t++) {
+        cand = makeQuestionOfKind(kind, level)
+      }
+      qs.push(cand)
+    }
     setQuestions(qs)
     setQi(0)
     setScore(0)
     setPicked(null)
     setSinging(false)
+    setSessionLog([])
+    setReviewMode(true)
     setPhase('playing')
   }
 
@@ -114,16 +176,15 @@ export default function App() {
   const runPlacementStage = (stage: number) => {
     const lv = PLACEMENT_LEVELS[stage]
     setLevel(lv)
-    const qs: Question[] = []
     // 每关 3 题：2 道听力 + 1 道识谱（第 1 关用识音代替识谱）
-    const boost: string[] = []
-    qs.push(makeQuestion(lv, boost))
-    qs.push(makeQuestion(lv, boost))
-    qs.push(lv >= 5 ? makeSightQuestion(lv) : makeQuestion(lv, boost))
+    const qs = genQuiz(lv, 2, [])
+    qs.push(lv >= 5 ? makeSightQuestion(lv) : makeQuestion(lv))
     setQuestions(qs)
     setQi(0)
     setPicked(null)
     setSinging(false)
+    setSessionLog([])
+    setReviewMode(false)
     setPhase('playing')
   }
 
@@ -142,6 +203,55 @@ export default function App() {
       case 'dyncmp': return question.answer === 'louder' ? '更响' : question.answer === 'softer' ? '更轻' : '一样响'
       case 'direct': return ({ up: '上行', down: '下行', repeat: '同音反复', wave: '先上后下' } as Record<DirectAns, string>)[question.answer]
       case 'meter': return question.beats === 2 ? '二拍子' : '三拍子'
+    }
+  }
+
+  // 旋律/节奏题的选项是 ABC 谱面，回顾时显示「选项 X」而不是原始数据
+  const answerLabelOf = (question: Question): string => {
+    if (question.kind === 'melody' || question.kind === 'rhythm') {
+      const idx = optionOf(question).findIndex(o => isCorrect(question, o.id))
+      return `选项${'ABC'[idx] ?? '?'}`
+    }
+    return questionAnswer(question)
+  }
+
+  // 答错后的文字诊断：不只给正确答案，还说清「你错在哪」
+  const diagnosisOf = (question: Question, pickedId: string): string => {
+    const pickedLabel = optionOf(question).find(o => o.id === pickedId)?.label ?? ''
+    switch (question.kind) {
+      case 'pitch':
+      case 'sight': {
+        const p = Number(pickedId)
+        return `你选的是 ${displayName(p)}，比正确答案${p > question.midi ? '高' : '低'}了`
+      }
+      case 'interval': {
+        const p = Number(pickedId)
+        return `你选的是${INTERVAL_NAMES[p]}——${INTERVAL_NAMES[question.semis]}比它更${question.semis > p ? '宽' : '窄'}`
+      }
+      case 'stepleap':
+        return question.answer === 'step'
+          ? '这两个音是紧挨着的（级进），中间没有跨键'
+          : '这两个音中间隔着键，是跳进'
+      case 'pitchcmp':
+      case 'durcmp':
+      case 'dyncmp':
+        return `你选的是「${pickedLabel}」，其实第二个音${questionAnswer(question)}`
+      case 'scale':
+        return question.mode === 'major'
+          ? '这是大调——第三个音高半音，听起来明亮'
+          : '这是小调——第三个音低半音，听起来柔和'
+      case 'timbre':
+        return `这是${questionAnswer(question)}的声音，记住它的味道`
+      case 'direct':
+        return `这串音其实是${questionAnswer(question)}，跟着音的起伏再听一遍`
+      case 'meter':
+        return question.beats === 2
+          ? '强拍每隔一拍出现一次，是二拍子'
+          : '强拍每隔两拍出现一次，是三拍子'
+      case 'melody':
+        return `你选的是${pickedLabel}，正确旋律是 ${question.notes.map(solfegeOf).join(' ')}`
+      case 'rhythm':
+        return `你选的是${pickedLabel}，对照标绿的节奏谱数一数拍子`
     }
   }
 
@@ -275,6 +385,10 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, qi, singing])
 
+  // 答错反馈的三层：结果（对错）→ 图形定位（正确项标绿）→ 文字诊断（错在哪）
+  // 长内容的题（旋律/节奏等）不再自动重播，靠延长停留 + 谱面对照
+  const LONG_KINDS: Kind[] = ['melody', 'rhythm', 'scale', 'timbre', 'meter', 'direct']
+
   const answer = (id: string) => {
     if (picked !== null || !q) return
     setPicked(id)
@@ -282,11 +396,20 @@ export default function App() {
     const nextScore = ok ? score + 1 : score
     if (ok) setScore(nextScore)
     setWrongBook(bumpWrong(wrongBook, wrongKeyOf(q), ok))
+    setSessionLog(log => [...log, { q, ok, picked: id }])
 
     const isPlacement = placementStage > 0 || questions.length === 3
 
     // 识音题答对后进入跟唱
     const needSing = ok && q.kind === 'pitch' && !isPlacement && !singing
+
+    // 答错：停留更久，短内容的题自动重播一遍，对照高亮的正确答案
+    if (!ok && !isPlacement && !LONG_KINDS.includes(q.kind)) {
+      window.setTimeout(() => playQuestion(q), 750)
+    }
+    const dwell = ok
+      ? (needSing ? 900 : 1200)
+      : isPlacement ? 2000 : LONG_KINDS.includes(q.kind) ? 3600 : 3200
 
     setTimeout(() => {
       if (needSing) {
@@ -294,7 +417,7 @@ export default function App() {
         return
       }
       advance(ok, nextScore)
-    }, needSing ? 900 : 1200)
+    }, dwell)
   }
 
   const advance = (ok: boolean, nextScore: number) => {
@@ -327,7 +450,7 @@ export default function App() {
       setQi(qi + 1)
     } else {
       const passed = nextScore >= PASS_SCORE
-      if (passed) {
+      if (passed && !reviewMode) {
         const today = new Date().toISOString().slice(0, 10)
         const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10)
         const count = streak.last === today ? streak.count : streak.last === yesterday ? streak.count + 1 : 1
@@ -417,7 +540,12 @@ export default function App() {
       {UNITS.map(u => (
         <div key={u.id} className="unitBlock">
           <img className="unitCover" src={`/covers/unit${u.id}.webp`} alt={u.name} />
-          <h3>{u.name}</h3>
+          <h3>
+            {u.name}
+            <span className="unitCount">
+              {u.lessonIds.filter(id => id < maxUnlocked).length} / {u.lessonIds.length} 只海螺
+            </span>
+          </h3>
           <div className="lessonGrid">
             {u.lessonIds.map(id => {
               const locked = id > maxUnlocked
@@ -429,6 +557,7 @@ export default function App() {
                   disabled={locked}
                   onClick={() => { warmup(); setLevel(id); setPhase('learn') }}
                 >
+                  {done && <img className="badgeIcon" src="/badges/conch.png" alt="" />}
                   <span className="lessonNum">{id}</span>
                   <span className="lessonTitle">{lessonOf(id).title}</span>
                 </button>
@@ -466,7 +595,13 @@ export default function App() {
         <span>第 {qi + 1} / {questions.length} 题</span>
         <span>得分 {score}</span>
       </div>
-      <div className="progressBar"><div style={{ width: `${(qi / questions.length) * 100}%` }} /></div>
+      <div className="quizDots">
+        {questions.map((_, i) => {
+          const log = sessionLog[i]
+          const cls = 'quizDot' + (log ? (log.ok ? ' done' : ' miss') : i === qi ? ' now' : '')
+          return <span key={i} className={cls} />
+        })}
+      </div>
 
       {!singing ? (
         <>
@@ -503,7 +638,16 @@ export default function App() {
 
           {picked !== null && (
             <div className={'feedback ' + (isCorrect(q, picked) ? 'ok' : 'no')}>
-              {isCorrect(q, picked) ? '答对了' : `正确答案是 ${questionAnswer(q)}`}
+              {isCorrect(q, picked) ? (
+                '答对了'
+              ) : (
+                <>
+                  <div className="fbDiag">{diagnosisOf(q, picked)}</div>
+                  <div className="fbAnswer">
+                    正确答案：{answerLabelOf(q)}（已标绿{!LONG_KINDS.includes(q.kind) && questions.length !== 3 ? '，声音会再播一遍' : ''}）
+                  </div>
+                </>
+              )}
               {q.kind === 'pitchcmp' && level <= 4 && (
                 <Piano highlight={[q.a, q.b]} marks={{ [q.a]: '①', [q.b]: '②' }} from={Math.min(q.a, q.b) - 3} to={Math.max(q.a, q.b) + 3} label={false} />
               )}
@@ -530,17 +674,64 @@ export default function App() {
   )
 
   const passed = score >= PASS_SCORE
+  const wrongsThis = sessionLog.filter(l => !l.ok)
+  const wrongKinds = topWrongKeys(wrongBook)
+  const justGraduated = !reviewMode && passed && level === LESSONS.length
+  const justUnlocked = !reviewMode && passed && level < LESSONS.length && maxUnlocked === level + 1
   const done = (
     <div className="donePage">
-      <h2>{passed ? '恭喜过关' : '还差一点'}</h2>
+      <h2>{reviewMode ? '错题订正完成' : justGraduated ? '毕业音乐会 · 圆满结束' : passed ? '恭喜过关' : '继续努力'}</h2>
       <p className="scoreLine">{score} / {questions.length}</p>
-      <p>{passed ? '下一课已经解锁。' : `答对 ${PASS_SCORE} 题即可过关，再试一次吧。`}</p>
-      {passed && <p className="streakLine">已连续打卡 {streak.count} 天</p>}
+      <p>
+        {reviewMode
+          ? '这组错题都订正了一遍，回地图继续吧。'
+          : justGraduated
+            ? '二十三课全部完成，你收集了满满一捧海螺。'
+            : passed
+              ? justUnlocked
+                ? `下一课已解锁，你收集到第 ${level} 只海螺。`
+                : '保持这个感觉，继续！'
+              : `已经答对 ${score} 题啦，再对 ${PASS_SCORE - score} 题就过关。`}
+      </p>
+      {passed && !reviewMode && <p className="streakLine">已连续打卡 {streak.count} 天</p>}
+
+      {justGraduated && (
+        <div className="gradWall">
+          {LESSONS.map(l => (
+            <img key={l.id} src="/badges/conch.png" className="gradBadge" style={{ animationDelay: `${l.id * 0.07}s` }} alt="海螺徽章" />
+          ))}
+        </div>
+      )}
+
+      {wrongsThis.length > 0 && (
+        <div className="reviewBox">
+          <h3>本次错题回顾</h3>
+          {wrongsThis.map((l, i) => (
+            <div key={i} className="reviewRow">
+              <div className="reviewText">
+                <span className="reviewPrompt">{promptOf(l.q)}</span>
+                <span className="reviewAns">
+                  你选：{optionOf(l.q).find(o => o.id === l.picked)?.label}　·　正确：{answerLabelOf(l.q)}
+                </span>
+              </div>
+              <button className="btn ghost small" onClick={() => playQuestion(l.q)}>▶ 重听</button>
+            </div>
+          ))}
+        </div>
+      )}
+
       <div className="doneBtns">
-        {passed && level < LESSONS.length && (
+        {!reviewMode && passed && level < LESSONS.length && (
           <button className="btn primary" onClick={() => { setLevel(level + 1); setPhase('learn') }}>进入第 {level + 1} 课</button>
         )}
-        <button className="btn ghost" onClick={() => startLevel(level)}>再练一遍</button>
+        {!reviewMode && (
+          <button className="btn ghost" onClick={() => startLevel(level)}>再练一遍</button>
+        )}
+        {wrongKinds.length > 0 && (
+          <button className="btn ghost" onClick={startWrongReview}>
+            {reviewMode ? '再练一组错题' : `只练错题（${wrongKinds.length} 类）`}
+          </button>
+        )}
         <button className="btn ghost" onClick={() => setPhase('map')}>回地图</button>
       </div>
     </div>
