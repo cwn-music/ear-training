@@ -12,10 +12,11 @@ import {
 } from './theory'
 import {
   ensureAudio, playMelody, playHarmonic, playRhythm, playTwo, playNote,
-  initInstruments, playInstrumentMelody,
+  initInstruments, playInstrumentMelody, playFill,
 } from './audio'
 import Staff from './Staff'
 import Sing from './Sing'
+import SingGroup from './SingGroup'
 import Piano from './Piano'
 import Learn from './Learn'
 
@@ -57,6 +58,17 @@ function bumpWrong(book: Record<string, number>, key: string, ok: boolean) {
 const topWrongKeys = (book: Record<string, number>) =>
   Object.entries(book).sort((a, b) => b[1] - a[1]).slice(0, 12).map(([k]) => k)
 
+// 补全音组题的琴键范围：选项+已给音的最小/最大各扩一个白键，两端都落在白键上（黑键开头的琴键会错位）
+const isWhiteKey = (m: number) => [0, 2, 4, 5, 7, 9, 11].includes(m % 12)
+const fillRange = (q: { options: number[]; seq: (number | null)[] }) => {
+  const all = [...q.options, ...q.seq.filter((n): n is number => n !== null)]
+  let from = Math.min(...all) - 1
+  let to = Math.max(...all) + 1
+  while (!isWhiteKey(from)) from--
+  while (!isWhiteKey(to)) to++
+  return { from, to }
+}
+
 // —— 出题去重 ——
 // 题目签名：同签名视为「雷同题」。一套题内不与前两题同签名；多题型的课不连出 3 道同题型
 const sigOf = (q: Question): string => {
@@ -74,6 +86,10 @@ const sigOf = (q: Question): string => {
     case 'pitchcmp': return `pc:${q.answer}:${Math.abs(q.b - q.a)}`
     case 'durcmp': return `dc:${q.answer}`
     case 'dyncmp': return `dy:${q.answer}`
+    case 'place': return `pl:${q.midi}`
+    case 'judge': return `jd:${q.midi}:${q.shown === q.midi}`
+    case 'fill': return `fi:${q.seq.map(n => n ?? 'x').join(',')}`
+    case 'sing': return `sg:${q.notes.join(',')}`
   }
 }
 
@@ -120,6 +136,10 @@ export default function App() {
   const audioReady = useRef(false)
 
   const q = questions[qi]
+  // 摆音符题的候选圈坐标（Staff 画完后回调回来，用于绝对定位热区）
+  const [slotRects, setSlotRects] = useState<{ midi: number; x: number; y: number }[]>([])
+  const slotRectsRef = useRef(slotRects)
+  slotRectsRef.current = slotRects
 
   useEffect(() => {
     save(P_PROGRESS, maxUnlocked)
@@ -203,6 +223,10 @@ export default function App() {
       case 'dyncmp': return question.answer === 'louder' ? '更响' : question.answer === 'softer' ? '更轻' : '一样响'
       case 'direct': return ({ up: '上行', down: '下行', repeat: '同音反复', wave: '先上后下' } as Record<DirectAns, string>)[question.answer]
       case 'meter': return question.beats === 2 ? '二拍子' : '三拍子'
+      case 'place': return displayName(question.midi)
+      case 'judge': return question.shown === question.midi ? '标对了' : '标错了'
+      case 'fill': return displayName(question.answer)
+      case 'sing': return question.notes.map(solfegeOf).join(' ')
     }
   }
 
@@ -252,6 +276,18 @@ export default function App() {
         return `你选的是${pickedLabel}，正确旋律是 ${question.notes.map(solfegeOf).join(' ')}`
       case 'rhythm':
         return `你选的是${pickedLabel}，对照标绿的节奏谱数一数拍子`
+      case 'place':
+        return `${displayName(question.midi)} 住在标绿的那个格子，从最近的线或间数过去`
+      case 'judge':
+        return question.shown === question.midi
+          ? '这个音其实标对了，它的名字就是它'
+          : `这个位置其实是 ${displayName(question.shown)}，不是 ${displayName(question.midi)}`
+      case 'fill': {
+        const p = Number(pickedId)
+        return `你补的是 ${displayName(p)}，中间这个音应该是 ${displayName(question.answer)}，跟着琴键再唱一遍`
+      }
+      case 'sing':
+        return '没关系，先点「再听一遍示范」，把三个音哼熟了再唱'
     }
   }
 
@@ -274,7 +310,7 @@ export default function App() {
         return question.options.map((v, i) => ({
           id: v.join(','),
           label: `选项${'ABC'[i]}`,
-          node: <Staff clef="treble" midi={71} rhythm={v} width={220} height={100} />,
+          node: <Staff clef="none" rhythm={v} width={220} height={100} />,
         }))
       case 'scale':
         return [{ id: 'major', label: '大调' }, { id: 'minor', label: '小调' }]
@@ -304,6 +340,12 @@ export default function App() {
       }
       case 'meter':
         return [{ id: '2', label: '二拍子' }, { id: '3', label: '三拍子' }]
+      case 'judge':
+        return [{ id: 'yes', label: '标对了 ✓' }, { id: 'no', label: '标错了 ✗' }]
+      case 'place': // 摆音符：点谱面上的发光圈作答，不出选项按钮
+      case 'fill': // 补全音组：点琴键作答，不出选项按钮
+      case 'sing': // 模唱：麦克风评测，不出选项按钮
+        return []
     }
   }
 
@@ -335,6 +377,10 @@ export default function App() {
       case 'dyncmp': return v === question.answer
       case 'direct': return v === question.answer
       case 'meter': return v === question.beats
+      case 'place': return Number(id) === question.midi
+      case 'judge': return (id === 'yes') === (question.shown === question.midi)
+      case 'fill': return Number(id) === question.answer
+      case 'sing': return id === 'sing-ok'
     }
   }
 
@@ -355,6 +401,10 @@ export default function App() {
       case 'dyncmp': playTwo(question.midi, question.midi, { va: question.va, vb: question.vb, gap: 0.5 }); break
       case 'direct': playMelody(question.notes); break
       case 'meter': playRhythm(question.tokens, 72, question.beats); break
+      case 'place': playNote(question.midi); break
+      case 'judge': playNote(question.shown); break
+      case 'fill': playFill(question.seq); break
+      case 'sing': playMelody(question.notes, 0.5, 0.7); break
     }
   }
 
@@ -373,11 +423,16 @@ export default function App() {
       case 'dyncmp': return '第二个音比第一个音——'
       case 'direct': return '这串音是怎么走的？'
       case 'meter': return '这段节奏是几拍子？'
+      case 'place': return `听一听、点一点：把 ${displayName(question.midi)} 放到谱面上它的位置`
+      case 'judge': return '谱面上这个音的名字，标对了吗？'
+      case 'fill': return '这段音组缺了一个音——听一听，点琴键把它补上'
+      case 'sing': return '听示范，跟着唱出这三个音（唱准一个亮一个）'
     }
   }
 
   // 题目切换时自动播放
   useEffect(() => {
+    setSlotRects([])
     if (phase === 'playing' && q && !singing) {
       const t = setTimeout(() => playQuestion(q), 350)
       return () => clearTimeout(t)
@@ -606,7 +661,9 @@ export default function App() {
       {!singing ? (
         <>
           <h3 className="prompt">{promptOf(q)}</h3>
-          <button className="btn ghost" onClick={() => playQuestion(q)}>▶ 再听一遍</button>
+          {q.kind !== 'sing' && (
+            <button className="btn ghost" onClick={() => playQuestion(q)}>▶ 再听一遍</button>
+          )}
 
           {q.kind === 'sight' && (
             <div className="staffBox">
@@ -617,6 +674,73 @@ export default function App() {
             <div className="staffBox">
               <Piano highlight={[q.midi]} label={false} />
             </div>
+          )}
+
+          {q.kind === 'place' && (
+            <div className="staffBox placeWrap">
+              <Staff
+                clef={q.clef}
+                slots={q.slots}
+                width={320}
+                height={150}
+                placedMidi={picked !== null ? Number(picked) : null}
+                revealMidi={picked !== null ? q.midi : null}
+                wrongMidi={picked !== null && Number(picked) !== q.midi ? Number(picked) : null}
+                onSlots={rects => {
+                  const prev = slotRectsRef.current
+                  if (prev.length !== rects.length || prev.some((p, i) => p.midi !== rects[i].midi)) {
+                    setSlotRects(rects)
+                  }
+                }}
+              />
+              {slotRects.map(r => (
+                <button
+                  key={r.midi}
+                  className="slotBtn"
+                  style={{ left: r.x, top: r.y }}
+                  disabled={picked !== null}
+                  aria-label={`放到这里`}
+                  onClick={() => answer(String(r.midi))}
+                />
+              ))}
+            </div>
+          )}
+
+          {q.kind === 'judge' && (
+            <div className="staffBox judgeBox">
+              <Staff clef={q.clef} midi={q.shown} width={300} />
+              <p className="judgeClaim">这个音是 <b>{displayName(q.midi)}</b></p>
+            </div>
+          )}
+
+          {q.kind === 'fill' && (
+            <div className="staffBox fillBox">
+              <div className="fillSeq">
+                {q.seq.map((n, i) =>
+                  n === null
+                    ? <span key={i} className={'fillGap' + (picked !== null ? (Number(picked) === q.answer ? ' ok' : ' no') : '')}>{picked !== null ? solfegeOf(Number(picked)) : '？'}</span>
+                    : <span key={i} className="fillNote">{solfegeOf(n)}</span>,
+                )}
+              </div>
+              <Piano
+                interactive={picked === null}
+                from={fillRange(q).from}
+                to={fillRange(q).to}
+                highlight={picked !== null ? [q.answer] : []}
+                onPick={m => answer(String(m))}
+              />
+            </div>
+          )}
+
+          {q.kind === 'sing' && picked === null && (
+            <SingGroup
+              targets={q.notes}
+              ghostMic={new URLSearchParams(location.search).has('ghostMic')}
+              onDone={ok => answer(ok ? 'sing-ok' : 'sing-no')}
+            />
+          )}
+          {q.kind === 'sing' && picked === null && (
+            <button className="btn ghost small" onClick={() => answer('sing-no')}>跳过这一题</button>
           )}
 
           <div className={'options' + (q.kind === 'melody' || q.kind === 'rhythm' ? ' wide' : '')}>
@@ -644,7 +768,13 @@ export default function App() {
                 <>
                   <div className="fbDiag">{diagnosisOf(q, picked)}</div>
                   <div className="fbAnswer">
-                    正确答案：{answerLabelOf(q)}（已标绿{!LONG_KINDS.includes(q.kind) && questions.length !== 3 ? '，声音会再播一遍' : ''}）
+                    {q.kind === 'sing'
+                      ? '示范随时可以重听，下一题继续加油'
+                      : q.kind === 'place'
+                        ? `正确答案：${answerLabelOf(q)}（谱面上标绿的位置）`
+                        : q.kind === 'fill'
+                          ? `正确答案：${answerLabelOf(q)}（琴键上已亮出，声音会再播一遍）`
+                          : `正确答案：${answerLabelOf(q)}（已标绿${!LONG_KINDS.includes(q.kind) && questions.length !== 3 ? '，声音会再播一遍' : ''}）`}
                   </div>
                 </>
               )}

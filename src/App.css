@@ -23,9 +23,7 @@ html {
    支持三种文件名（放任意一个就行）：main.woff2 / main.ttf / main.otf */
 @font-face {
   font-family: 'MuseCustom';
-  src: url('/fonts/main.woff2') format('woff2'),
-       url('/fonts/main.ttf') format('truetype'),
-       url('/fonts/main.otf') format('opentype');
+  src: url('/fonts/main.woff2') format('woff2');
   font-display: swap; /* 字体加载期间先用系统字体，加载完自动切换 */
 }
 
@@ -377,6 +375,89 @@ h1, h2, h3 { font-weight: 600; color: var(--slate); }
 .singDot.done { color: var(--green); }
 .singHeard { font-size: 0.96875rem; color: #6b7280; }
 
+/* —— 三音组模唱 —— */
+.singGroupRow {
+  display: flex; gap: 14px; justify-content: center; margin: 8px 0 4px;
+}
+.singGroupNote {
+  position: relative;
+  min-width: 74px; padding: 10px 8px;
+  border: 1.5px dashed var(--kraft); border-radius: 12px;
+  background: #fff; color: var(--slate);
+  font-size: 1.05rem; font-weight: 600;
+  transition: all 0.25s;
+}
+.singGroupNote.now {
+  border-color: var(--gold); border-style: solid;
+  box-shadow: 0 0 0 4px rgba(185, 150, 47, 0.12);
+  animation: singPulse 1.2s ease-in-out infinite;
+}
+.singGroupNote.hit {
+  border-color: var(--green); border-style: solid;
+  background: #eef7ec; color: #2c662d;
+}
+.singGroupCheck { margin-left: 4px; color: var(--green); }
+@keyframes singPulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+}
+
+/* —— 摆音符 —— */
+.placeWrap { position: relative; display: block; }
+.placeWrap .staffWrap { margin: 0 auto; width: fit-content; }
+.slotBtn {
+  position: absolute;
+  width: 44px; height: 44px;
+  transform: translate(-50%, -50%);
+  background: transparent; border: 0; cursor: pointer;
+  border-radius: 50%;
+}
+.slotBtn:disabled { cursor: default; }
+.slotBtn:not(:disabled):active { background: rgba(185, 150, 47, 0.18); }
+
+/* —— 位置判断 —— */
+.judgeBox { flex-direction: column; align-items: center; }
+.judgeClaim { margin: 6px 0 0; font-size: 1.1rem; color: var(--slate); }
+.judgeClaim b { color: var(--ink); }
+
+/* —— 补全音组 —— */
+.fillBox { flex-direction: column; align-items: center; gap: 4px; }
+.fillBox .piano { width: 100%; }
+.fillSeq {
+  display: flex; gap: 12px; justify-content: center; align-items: center;
+  margin: 4px 0 12px; font-size: 1.4rem; font-weight: 600; color: var(--slate);
+}
+.fillNote { min-width: 44px; text-align: center; }
+.fillGap {
+  min-width: 44px; text-align: center;
+  color: var(--gold); border-bottom: 2px dashed var(--gold);
+}
+.fillGap.ok { color: #2c662d; border-bottom-color: var(--green); }
+.fillGap.no { color: var(--red); border-bottom-color: var(--red); }
+
+/* —— 单音闪卡 —— */
+.flashGrid {
+  display: grid; grid-template-columns: repeat(4, 1fr);
+  gap: 10px; margin-top: 8px;
+}
+.flashCard {
+  background: #fff; border: 1px solid var(--kraft); border-radius: 10px;
+  padding: 4px 2px 8px; cursor: pointer; text-align: center;
+  transition: transform 0.15s, box-shadow 0.15s, background 0.2s;
+  font-family: inherit;
+}
+.flashCard:active { transform: scale(0.96); }
+.flashCard .staffWrap { display: flex; justify-content: center; }
+.flashName {
+  display: block; font-size: 0.9rem; color: var(--gold); font-weight: 600;
+}
+.flashCard.flipped { background: #f4f9f4; border-color: var(--green); }
+.flashCard.flipped .flashName { color: #2c662d; }
+@media (max-width: 480px) {
+  .flashGrid { grid-template-columns: repeat(3, 1fr); }
+  .singGroupNote { min-width: 62px; font-size: 0.95rem; }
+}
+
 /* —— 结算 —— */
 .donePage { text-align: center; padding-top: 40px; }
 .scoreLine { font-size: 2.5rem; font-weight: 700; color: var(--slate); margin: 10px 0; }
@@ -548,7 +629,7 @@ h1, h2, h3 { font-weight: 600; color: var(--slate); }
 }
 .dictHead { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .dictName {
-  font-family: "Songti SC", "Noto Serif SC", serif;
+  font-family: 'MuseCustom', "Songti SC", "Noto Serif SC", serif;
   font-size: 1.0625rem;
   letter-spacing: 0.12em;
   color: #22304a;
@@ -573,12 +654,12 @@ h1, h2, h3 { font-weight: 600; color: var(--slate); }
 .dictStrip {
   position: relative;
   display: flex;
-  gap: 3px;
   height: 26px;
   margin-top: 6px;
   padding: 3px;
   border: 1px dashed rgba(34, 48, 74, 0.35);
   border-radius: 8px 9px 8px 10px / 9px 8px 10px 8px;
+  background-origin: content-box; /* 格线 25% 按色块区计算，与色块边界精确对齐 */
   background-image: repeating-linear-gradient(
     to right,
     transparent 0,
@@ -587,7 +668,12 @@ h1, h2, h3 { font-weight: 600; color: var(--slate); }
     rgba(34, 48, 74, 0.22) 25%
   );
 }
-.dictSeg { background: #6fa8c8; border-radius: 4px 5px 4px 5px; min-width: 4px; }
+.dictSeg {
+  background: #6fa8c8;
+  border-radius: 4px 5px 4px 5px;
+  min-width: 4px;
+  outline: 1.5px solid var(--paper); /* 纸色描边分隔色块，不占宽度，保证块界精确对格线 */
+}
 .dictSeg.rest {
   background: repeating-linear-gradient(135deg, rgba(34, 48, 74, 0.14) 0 4px, transparent 4px 8px);
 }
@@ -610,7 +696,7 @@ h1, h2, h3 { font-weight: 600; color: var(--slate); }
   100% { left: calc(100% - 2px); opacity: 0; }
 }
 .dictFoot { display: flex; align-items: center; gap: 10px; margin-top: 4px; }
-.dictTicks { flex: 1; display: flex; }
+.dictTicks { flex: 1; display: flex; padding: 0 4px; /* 补偿 strip 的 1px 边框 + 3px 内边距，刻度对齐格线 */ }
 .dictTicks span {
   flex: 1;
   font-size: 0.75rem;

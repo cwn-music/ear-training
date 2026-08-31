@@ -2,7 +2,7 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { lessonOf, INSTRUMENTS } from './lessons'
 import { ensureAudio, playMelody, playRhythm, playTwo, initInstruments, playInstrumentMelody, playNote } from './audio'
-import { INTERVAL_NAMES } from './theory'
+import { INTERVAL_NAMES, displayName, type Clef } from './theory'
 import Staff from './Staff'
 import Piano from './Piano'
 import RhythmDict, { COMBO_ENTRIES } from './RhythmDict'
@@ -34,14 +34,17 @@ const HOWTO: Record<number, string[]> = {
   2: ['会先后播放两个音', '判断第二个音比第一个更高还是更低，点对应按钮', '不确定就点「再听一遍」，不限次数'],
   3: ['会先后播放两个音', '判断第二个音更长还是更短'],
   4: ['会先后播放两个音', '判断第二个音更响还是更轻'],
-  5: ['先看谱面上音符的位置，再听它的声音', '在选项里点它的名字', '从 do 或 sol 出发，一格一格数到它的位置'],
+  5: ['先看谱面上音符的位置，再听它的声音', '在选项里点它的名字', '「摆音符」题：听一个音，在谱面上点发光的圆圈，把它放回自己的位置', '「对不对」题：谱上标的名字，你觉得对就点 ✓，不对就点 ✗', '从 do 或 sol 出发，一格一格数到它的位置'],
   6: ['两个音会一起响起', '判断它们之间的距离（音程）是几度', '两个音隔得越远，音程越宽'],
   8: ['会先后播放两个音', '挨着的是级进，隔得远的是跳进'],
-  9: ['听一小串音', '判断它整体往上走、往下走，还是原地不动'],
+  9: ['听一小串音', '判断它整体往上走、往下走，还是原地不动', '「补缺口」题：三个音中间空了一个，点琴键把它补上'],
   10: ['听一小段旋律', '选项是三小段谱子，找出和你听到的一样那段', '先听走向，再对谱子上的高高低低'],
   11: ['听一段节奏', '选项是三行节奏谱，找出相同的一段', '问「几拍子」时，数强拍隔几拍出现一次'],
   12: ['听一段旋律，判断是哪种乐器在演奏', '分不清就多点几次「再听一遍」，抓住乐器的「味道」'],
+  14: ['识谱范围变宽了，会出现下加线、上加线的音', '「摆音符」题：把听到的音点到谱面上发光的格子里', '「对不对」题：谱上标的名字你觉得对就点 ✓'],
+  15: ['低音谱表的题和高音谱表一样做，只是起点不同', '「摆音符」与「对不对」题会帮你熟悉新地图'],
   19: ['听一串音阶', '大调明亮、小调柔和，关键差别在第三个音'],
+  21: ['识谱与旋律题和以前一样', '「开口唱」题：听三个音，跟着唱出来，唱准一个亮一个', '会用到麦克风，点允许就好；不方便唱可以跳过'],
 }
 
 function Card({ title, children }: { title: string; children: ReactNode }) {
@@ -79,6 +82,28 @@ function IntervalCard({ semis }: { semis: number }) {
       <div className="intervalDesc">{INTERVAL_DESCS[semis]}</div>
       <PlayBtn label="先后" onPlay={() => playMelody([60, 60 + semis], 0.5)} />
       <PlayBtn label="同时" onPlay={() => { playMelody([60], 0, 1.4); playMelody([60 + semis], 0, 1.4) }} />
+    </div>
+  )
+}
+
+// 单音闪卡：一张卡一个谱面位置，先自己说名字，再点开对答案（同时听声音）
+function Flashcards({ clef, notes }: { clef: Clef; notes: number[] }) {
+  const [flipped, setFlipped] = useState<Record<number, boolean>>({})
+  return (
+    <div className="flashGrid">
+      {notes.map(m => (
+        <button
+          key={m}
+          className={'flashCard' + (flipped[m] ? ' flipped' : '')}
+          onClick={() => {
+            setFlipped(f => ({ ...f, [m]: !f[m] }))
+            void ensureAudio().then(() => playNote(m))
+          }}
+        >
+          <Staff clef={clef} midi={m} width={108} height={92} />
+          <span className="flashName">{flipped[m] ? displayName(m) : '?'}</span>
+        </button>
+      ))}
     </div>
   )
 }
@@ -160,8 +185,12 @@ export default function Learn({ lessonId, onStart, onBack }: Props) {
               <p className="tip">高音谱号又叫做 sol 谱号：它的圆圈绕着第二线，第二线上的音就是 sol。do（中央 do）住在五线谱下面的下加一线上。</p>
               <Staff clef="treble" midi={60} width={300} />
             </Card>
+            <Card title="单音卡片 · 每个位置认一认">
+              <p>一个卡片一个位置。先看着音符说出它的名字，再点开对答案——顺便听一听它的声音。</p>
+              <Flashcards clef="treble" notes={[60, 62, 64, 65, 67, 69, 71, 72]} />
+            </Card>
             <Card title="看谱 → 唱名">
-              <p>先看音符的位置，说出它是什么音，再把它唱出来。</p>
+              <p>先看音符的位置，说出它是什么音，再把它唱出来。练习里还会请你把听到的音「放」到谱面上它自己的位置，反过来也能帮你记住地图。</p>
             </Card>
           </>
         )
@@ -265,10 +294,16 @@ export default function Learn({ lessonId, onStart, onBack }: Props) {
         )
       case 14:
         return (
-          <Card title="高音谱表进阶">
-            <p>五线谱还可以往下加线、往上加线，装下更低和更高的音。这一课我们把认谱范围放宽到低音 la 到高音 mi。</p>
-            <Staff clef="treble" midi={76} width={300} />
-          </Card>
+          <>
+            <Card title="高音谱表进阶">
+              <p>五线谱还可以往下加线、往上加线，装下更低和更高的音。这一课我们把认谱范围放宽到低音 la 到高音 mi。</p>
+              <Staff clef="treble" midi={76} width={300} />
+            </Card>
+            <Card title="单音卡片 · 更宽的范围">
+              <p>老规矩：先说名字，再点开对答案。多了加线上的位置，别慌，一格一格数。</p>
+              <Flashcards clef="treble" notes={[57, 59, 60, 62, 64, 65, 67, 69, 71, 72, 74, 76]} />
+            </Card>
+          </>
         )
       case 15:
         return (
@@ -276,6 +311,10 @@ export default function Learn({ lessonId, onStart, onBack }: Props) {
             <Card title="低音谱号">
               <p>低音谱号又叫做 fa 谱号：它的两个点夹着第四线，第四线上的音就是 fa。左手的低音区常用它。</p>
               <Staff clef="bass" midi={53} width={300} />
+            </Card>
+            <Card title="单音卡片 · 低音谱表">
+              <p>同一张地图，换了一把尺子。先说名字，再点开对答案。</p>
+              <Flashcards clef="bass" notes={[40, 41, 43, 45, 47, 48, 50, 52, 53, 55]} />
             </Card>
           </>
         )
@@ -330,10 +369,16 @@ export default function Learn({ lessonId, onStart, onBack }: Props) {
         )
       case 21:
         return (
-          <Card title="视唱综合">
-            <p>看着谱子，先在心里听到它，再唱出来。唱错了没关系，多听一遍范唱再试。</p>
-            <Staff clef="treble" midi={67} width={300} />
-          </Card>
+          <>
+            <Card title="视唱综合">
+              <p>看着谱子，先在心里听到它，再唱出来。唱错了没关系，多听一遍范唱再试。</p>
+              <Staff clef="treble" midi={67} width={300} />
+            </Card>
+            <Card title="开口唱 · 三音组模唱">
+              <p>这一课开始，真的要开口唱了。系统先弹三个音，你跟着唱——用「啦」哼也行。唱准一个，那个音就会亮起来。第一次会向你借一下麦克风，唱完就还。</p>
+              <p className="tip">小诀窍：先把示范多听两遍，在心里跟着哼，再出声。</p>
+            </Card>
+          </>
         )
       case 22:
         return (

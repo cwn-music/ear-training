@@ -65,6 +65,15 @@ export function playHarmonic(notes: number[], dur = 1.6) {
   notes.forEach(n => safeTrigger(piano!, midiToName(n), dur, now, 0.8))
 }
 
+// 补全音组题：序列里的 null 是空拍（停顿一拍），让「缺了一个音」能被听出来
+export function playFill(seq: (number | null)[], gap = 0.45, dur = 0.85) {
+  if (!piano) return
+  const now = Tone.now()
+  seq.forEach((n, i) => {
+    if (n !== null) safeTrigger(piano!, midiToName(n), dur, now + i * (dur + gap), 0.9)
+  })
+}
+
 // 两个音：各自的时值 / 力度可不同（长短、强弱比较题用）
 export function playTwo(a: number, b: number, opt: { da?: number; db?: number; va?: number; vb?: number; gap?: number } = {}) {
   if (!piano) return

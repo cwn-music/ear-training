@@ -10,11 +10,12 @@ interface Props {
   marks?: Record<number, string>
   interactive?: boolean
   label?: boolean
+  onPick?: (midi: number) => void // 点键作答（补全音组题用）；提供后点键会先发声再回调
 }
 
 const BLACK_PCS = new Set([1, 3, 6, 8, 10])
 
-export default function Piano({ from = 60, to = 71, highlight = [], marks = {}, interactive = false, label = true }: Props) {
+export default function Piano({ from = 60, to = 71, highlight = [], marks = {}, interactive = false, label = true, onPick }: Props) {
   const { whites, blacks } = useMemo(() => {
     const ws: number[] = []
     const bs: { midi: number; afterWhite: number }[] = []
@@ -34,6 +35,7 @@ export default function Piano({ from = 60, to = 71, highlight = [], marks = {}, 
   const press = (m: number) => {
     if (!interactive) return
     void ensureAudio().then(() => playNote(m, 0.8, 0.9))
+    onPick?.(m)
   }
 
   return (

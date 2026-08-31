@@ -28,9 +28,20 @@ export type DirectAns = 'up' | 'down' | 'repeat' | 'wave'
 export type DirectQ = { kind: 'direct'; notes: number[]; answer: DirectAns; options: DirectAns[] }
 export type MeterQ = { kind: 'meter'; beats: 2 | 3; tokens: Tok[] }
 
+// —— 第二批新题型（按思维导图训练方式补充）——
+// 摆音符：点击谱面上发光的候选位置，把题干给的音放上去（多邻国拖拽式的点击化改造）
+export type PlaceQ = { kind: 'place'; midi: number; clef: Clef; slots: number[] }
+// 位置判断：谱上画一个音并标注唱名，判断标注对不对
+export type JudgeQ = { kind: 'judge'; midi: number; shown: number; clef: Clef }
+// 补全音组：三个音挖掉中间一个，听出来后点琴键补上
+export type FillQ = { kind: 'fill'; seq: (number | null)[]; answer: number; options: number[] }
+// 三音组模唱：听三个音，跟着唱准（麦克风评测）
+export type SingQ = { kind: 'sing'; notes: number[] }
+
 export type Question =
   | PitchQ | StepleapQ | IntervalQ | MelodyQ | RhythmQ | ScaleQ | TimbreQ | SightQ
   | PitchCmpQ | DurCmpQ | DynCmpQ | DirectQ | MeterQ
+  | PlaceQ | JudgeQ | FillQ | SingQ
 
 export type Kind = Question['kind']
 
@@ -46,6 +57,19 @@ function shuffle<T>(arr: T[]): T[] {
   return a
 }
 const isWhite = (m: number) => [0, 2, 4, 5, 7, 9, 11].includes(m % 12)
+
+// 自然音级步数（C 大调白键的线/间位置，相邻白键差 1）：谱面上下挪一格就 ±1
+const DIA_STEPS = [0, 2, 4, 5, 7, 9, 11]
+export function diatonicStep(midi: number): number {
+  const idx = DIA_STEPS.indexOf(midi % 12)
+  return Math.floor(midi / 12) * 7 + (idx < 0 ? 0 : idx)
+}
+// 反查：给定步数找 midi（仅白键）
+export function midiOfStep(step: number): number {
+  const oct = Math.floor(step / 7)
+  const idx = ((step % 7) + 7) % 7
+  return oct * 12 + DIA_STEPS[idx]
+}
 
 export const NOTE_NAMES = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B']
 const SOLFEGE = ['do', 'do♯', 're', 're♯', 'mi', 'fa', 'fa♯', 'sol', 'sol♯', 'la', 'la♯', 'si']
@@ -197,6 +221,94 @@ export function makeSightQuestion(level: number): SightQ {
   return { kind: 'sight', midi, clef, options: pitchOptions(midi, m => m >= lo - 7 && m <= hi + 7 && (!whiteOnly || isWhite(m))) }
 }
 
+// —— 第二批新题型生成器 ——
+// 摆音符 / 位置判断的音域与谱号规则和识谱题一致（第 5 课起都是白键）
+function sightRange(level: number): { lo: number; hi: number } {
+  if (level === 15) return { lo: 40, hi: 55 }
+  if (level >= 14) return { lo: 57, hi: 76 }
+  return { lo: 60, hi: 72 }
+}
+
+function genPlace(level: number): PlaceQ {
+  const { lo, hi } = sightRange(level)
+  let midi = 60
+  for (let t = 0; t < 30; t++) {
+    midi = rand(lo, hi)
+    if (isWhite(midi)) break
+  }
+  const clef: Clef = midi <= 57 ? 'bass' : 'treble'
+  // 候选位置：目标 + 上下相邻的白键格子（隔 1~3 格），共 4 个互不重复
+  const step0 = diatonicStep(midi)
+  const slots = new Set<number>([midi])
+  for (let t = 0; t < 40 && slots.size < 4; t++) {
+    const s = step0 + pick([-3, -2, -1, 1, 2, 3])
+    const m = midiOfStep(s)
+    if (m >= lo - 4 && m <= hi + 4) slots.add(m)
+  }
+  // 兜底：范围太窄时直接往上补
+  for (let s = step0 + 1; slots.size < 4; s++) slots.add(midiOfStep(s))
+  return { kind: 'place', midi, clef, slots: shuffle([...slots]) }
+}
+
+function genJudge(level: number): JudgeQ {
+  const { lo, hi } = sightRange(level)
+  let midi = 60
+  for (let t = 0; t < 30; t++) {
+    midi = rand(lo, hi)
+    if (isWhite(midi)) break
+  }
+  const clef: Clef = midi <= 57 ? 'bass' : 'treble'
+  // 一半概率画对；画错时挪 1~2 格白键位置（错位足够明显又不离谱）
+  const right = Math.random() < 0.5
+  let shown = midi
+  if (!right) {
+    for (let t = 0; t < 20; t++) {
+      const m = midiOfStep(diatonicStep(midi) + pick([-2, -1, 1, 2]))
+      if (m >= lo - 4 && m <= hi + 4 && m !== midi) { shown = m; break }
+    }
+    if (shown === midi) shown = midiOfStep(diatonicStep(midi) + 1)
+  }
+  return { kind: 'judge', midi, shown, clef }
+}
+
+function genFill(): FillQ {
+  // 三音组挖中间音：级进（do _ mi）或三度跳进组合（do _ sol 这类），全部落在白键上
+  // patterns 用音级步数（相邻白键差 1），保证任何根音下都是自然音
+  const patterns: number[][] = [
+    [0, 1, 2],   // do re mi
+    [0, 2, 4],   // do mi sol
+    [0, 1, 4],   // do re sol（先级进后跳进）
+    [0, 2, 1],   // do mi re（先跳后级，向下回）
+    [0, 4, 2],   // do sol mi
+    [0, 2, 5],   // do mi la
+    [0, 3, 4],   // do fa sol
+  ]
+  const rootStep = rand(diatonicStep(48), diatonicStep(60))
+  const pat = pick(patterns)
+  const seq = pat.map(s => midiOfStep(rootStep + s))
+  const answer = seq[1]
+  // 选项：缺音 + 邻近两个白键
+  const opts = new Set<number>([answer])
+  for (let t = 0; t < 20 && opts.size < 3; t++) {
+    opts.add(midiOfStep(diatonicStep(answer) + pick([-2, -1, 1, 2])))
+  }
+  return { kind: 'fill', seq: [seq[0], null, seq[2]], answer, options: shuffle([...opts]) }
+}
+
+function genSing(): SingQ {
+  // 三音组：只用白键（第 21 课还没教黑键模唱），级进为主、允许一次三度小跳，落在舒适音域
+  for (let t = 0; t < 40; t++) {
+    const start = midiOfStep(rand(diatonicStep(55), diatonicStep(64)))
+    const d1 = pick([-2, -1, -1, 1, 1, 2]) // 白键步：±1=级进 ±2=三度
+    const d2 = pick([-2, -1, -1, 1, 1, 2])
+    const notes = [start, midiOfStep(diatonicStep(start) + d1), midiOfStep(diatonicStep(start) + d1 + d2)]
+    if (notes.every(n => n >= 53 && n <= 67) && notes[0] !== notes[1] && notes[1] !== notes[2]) {
+      return { kind: 'sing', notes }
+    }
+  }
+  return { kind: 'sing', notes: [60, 62, 64] }
+}
+
 // —— 第一批新题型生成器 ——
 function genPitchCmp(level: number): PitchCmpQ {
   // 初级（1~2 课）只用五度/八度大跨度，且不出「一样高」
@@ -294,25 +406,25 @@ export const LEVEL_KINDS: Record<number, Kind[]> = {
   2: ['pitchcmp', 'pitch'],
   3: ['durcmp'],
   4: ['dyncmp'],
-  5: ['sight', 'pitch'],
+  5: ['sight', 'pitch', 'place', 'judge'],
   6: ['interval', 'pitch'],
   7: ['interval', 'pitch'],
   8: ['interval', 'stepleap'],
-  9: ['stepleap', 'direct'],
+  9: ['stepleap', 'direct', 'fill'],
   10: ['direct', 'melody'],
   11: ['meter', 'rhythm'],
   12: ['timbre', 'pitchcmp'],
-  13: ['interval', 'stepleap', 'rhythm', 'melody'],
-  14: ['sight', 'pitch'],
-  15: ['sight', 'pitchcmp'],
+  13: ['interval', 'stepleap', 'rhythm', 'melody', 'fill'],
+  14: ['sight', 'pitch', 'place', 'judge'],
+  15: ['sight', 'pitchcmp', 'place', 'judge'],
   16: ['melody', 'direct'],
   17: ['rhythm', 'meter'],
   18: ['interval', 'pitch'],
   19: ['scale', 'interval'],
   20: ['pitch', 'interval'],
-  21: ['sight', 'melody'],
+  21: ['sight', 'melody', 'sing'],
   22: ['sight', 'pitch'],
-  23: ['pitchcmp', 'durcmp', 'dyncmp', 'direct', 'meter', 'interval', 'melody', 'rhythm', 'scale', 'timbre', 'sight', 'stepleap', 'pitch'],
+  23: ['pitchcmp', 'durcmp', 'dyncmp', 'direct', 'meter', 'interval', 'melody', 'rhythm', 'scale', 'timbre', 'sight', 'stepleap', 'pitch', 'place', 'judge', 'fill'],
 }
 
 // 按指定题型生成一题（错题重练用：只抽错题题型，生成同知识点变式题）
@@ -331,6 +443,10 @@ export function makeQuestionOfKind(kind: Kind, level: number): Question {
     case 'dyncmp': return genDynCmp(level)
     case 'direct': return genDirect(level)
     case 'meter': return genMeter()
+    case 'place': return genPlace(level)
+    case 'judge': return genJudge(level)
+    case 'fill': return genFill()
+    case 'sing': return genSing()
   }
 }
 

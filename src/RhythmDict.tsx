@@ -20,7 +20,7 @@ export interface DictEntry {
 const ENTRIES: DictEntry[] = [
   { name: '四分音符', glyph: ['q'], demo: ['q', 'q', 'q', 'q'] },
   { name: '八分音符', alias: '两个连在一起，又叫「二八」', glyph: ['ee'], demo: ['ee', 'ee', 'ee', 'ee'] },
-  { name: '十六分音符', alias: '四个连在一起，又叫「四十六」', glyph: ['eeee'], demo: ['eeee', 'eeee', 'eeee', 'eeee'] },
+  { name: '十六分音符', alias: '四个连在一起，又叫「四十六」', glyph: ['eeee'], demo: ['eeee', 'eeee', 'eeee', 'eeee'], glyphW: 132 },
   { name: '二分音符', glyph: ['h'], demo: ['h', 'h'] },
   { name: '附点四分音符', glyph: ['q.'], demo: ['q.', 'q.', 'q'] },
   { name: '四分休止符', glyph: ['r'], demo: ['q', 'r', 'q', 'r'] },
