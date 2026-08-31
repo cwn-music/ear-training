@@ -403,8 +403,10 @@ h1, h2, h3 { font-weight: 600; color: var(--slate); }
 }
 
 /* —— 摆音符 —— */
-.placeWrap { position: relative; display: block; }
-.placeWrap .staffWrap { margin: 0 auto; width: fit-content; }
+/* 摆音符：容器必须恰好包住 SVG，热区坐标才与谱面圈严格对齐
+   （staffBox 的 padding 与 staffWrap 的 auto 居中都会让 SVG 原点偏离容器原点） */
+.placeWrap { position: relative; display: block; width: fit-content; margin: 10px auto; padding: 0; }
+.placeWrap .staffWrap { margin: 0; width: auto; }
 .slotBtn {
   position: absolute;
   width: 44px; height: 44px;

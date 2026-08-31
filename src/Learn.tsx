@@ -100,7 +100,7 @@ function Flashcards({ clef, notes }: { clef: Clef; notes: number[] }) {
             void ensureAudio().then(() => playNote(m))
           }}
         >
-          <Staff clef={clef} midi={m} width={108} height={92} />
+          <Staff clef={clef} midi={m} width={108} height={112} noteX={66} staveY={0} />
           <span className="flashName">{flipped[m] ? displayName(m) : '?'}</span>
         </button>
       ))}
@@ -121,7 +121,7 @@ export default function Learn({ lessonId, onStart, onBack }: Props) {
         return (
           <>
             <Card title="认识琴键">
-              <p>钢琴的白键七个一组，依次是 do re mi fa sol la si。最中间那组的 do 叫「中央 do」。</p>
+              <p>钢琴的白键七个一组，依次是 do re mi fa sol la si。</p>
               <p>点一点琴键，听听它们的声音：</p>
               <Piano interactive highlight={[60, 62, 64]} />
             </Card>

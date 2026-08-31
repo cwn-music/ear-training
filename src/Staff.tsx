@@ -24,6 +24,10 @@ interface Props {
   revealMidi?: number | null // 揭晓：这个音的位置画绿圈（正确答案）
   wrongMidi?: number | null // 揭晓：错选的位置画红圈
   onSlots?: (rects: SlotRect[]) => void
+  // —— 手动定位模式（闪卡等小尺寸单音）：绕开 Formatter，符头固定画在这个 x ——
+  noteX?: number
+  // 谱表 y 偏移（VexFlow 会在其上方再留 40px 头部，小画布需下调 staveY 并加高 height）
+  staveY?: number
 }
 
 // 把节奏 token 转成 VexFlow StaveNote
@@ -57,7 +61,7 @@ function tokNotes(tok: Tok, midi: number): StaveNote[] {
   }
 }
 
-export default function Staff({ clef = 'treble', midi = null, midis, chord = false, rhythm, width = 320, height = 120, slots, placedMidi = null, revealMidi = null, wrongMidi = null, onSlots }: Props) {
+export default function Staff({ clef = 'treble', midi = null, midis, chord = false, rhythm, width = 320, height = 120, slots, placedMidi = null, revealMidi = null, wrongMidi = null, onSlots, noteX, staveY }: Props) {
   const ref = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -78,8 +82,8 @@ export default function Staff({ clef = 'treble', midi = null, midis, chord = fal
       renderer.resize(width, height)
       const ctx = renderer.getContext()
       ctx.setFont('Arial', 10)
-      // 摆音符模式抬高谱表，给上加线/下加线的候选圈留位置
-      const stave = new Stave(8, slots ? 44 : 12, width - 16)
+      // 摆音符模式抬高谱表，给上加线/下加线的候选圈留位置；闪卡用小画布紧凑布局
+      const stave = new Stave(8, staveY ?? (slots ? 44 : 12), width - 16)
       if (clef === 'none') {
         // 教材式节奏谱：隐藏五线谱线（保留谱表定位功能），符头排在同一高度
         stave.options.lineConfig.forEach(l => { l.visible = false })
@@ -88,48 +92,62 @@ export default function Staff({ clef = 'treble', midi = null, midis, chord = fal
       }
       stave.setContext(ctx).draw()
 
+      // —— 共用 SVG 手绘工具（摆音符 / 闪卡手动单音用）——
+      const svgEl = el.querySelector('svg')
+      const svg: SVGSVGElement | null = svgEl
+      const NS = 'http://www.w3.org/2000/svg'
+      const mk = <T extends SVGElement>(tag: string) => document.createElementNS(NS, tag) as T
+      const lineOf = (m: number) => {
+        const n = new StaveNote({ keys: [keyOf(m)], duration: 'q', clef: clef === 'none' ? 'treble' : clef })
+        return n.getKeyProps()[0].line // 半格数（treble 从 c/4=0 起）
+      }
+      const yOf = (m: number) => stave.getYForLine(5 - lineOf(m)) // 5 线坐标：0=顶线 4=底线
+      const INK = '#22304A'
+      // 加线（音落在线外时画对应的小横线）
+      const ledger = (x: number, line: number, color: string) => {
+        if (!svg) return
+        const lo = Math.floor(Math.min(line, 1))
+        const hi = Math.ceil(Math.max(line, 5))
+        for (let l = lo; l <= 0; l++) drawLedgerSeg(l)
+        for (let l = 6; l <= hi; l++) drawLedgerSeg(l)
+        function drawLedgerSeg(l: number) {
+          const seg = mk<SVGLineElement>('line')
+          seg.setAttribute('x1', String(x - 15)); seg.setAttribute('x2', String(x + 15))
+          seg.setAttribute('y1', String(stave.getYForLine(5 - l))); seg.setAttribute('y2', String(stave.getYForLine(5 - l)))
+          seg.setAttribute('stroke', color); seg.setAttribute('stroke-width', '1.6')
+          svg!.appendChild(seg)
+        }
+      }
+
+      // 手动单音模式（闪卡等小尺寸）：符头固定在 noteX，绕开 Formatter
+      if (noteX != null && midi !== null && !rhythm && !midis && clef !== 'none' && svg) {
+        const y = yOf(midi)
+        ledger(noteX, lineOf(midi), INK)
+        const head = mk<SVGEllipseElement>('ellipse')
+        head.setAttribute('cx', String(noteX)); head.setAttribute('cy', String(y))
+        head.setAttribute('rx', '6.2'); head.setAttribute('ry', '4.6')
+        head.setAttribute('fill', '#FFFDF7'); head.setAttribute('stroke', INK); head.setAttribute('stroke-width', '2')
+        head.setAttribute('transform', `rotate(-18 ${noteX} ${y})`)
+        svg.appendChild(head)
+      }
+
       // 摆音符：候选发光圈 + 已放置的符头
-      if (slots && clef !== 'none') {
-        const svgEl = el.querySelector('svg')
-        if (svgEl) {
-          const svg: SVGSVGElement = svgEl
-          const NS = 'http://www.w3.org/2000/svg'
-          const mk = <T extends SVGElement>(tag: string) => document.createElementNS(NS, tag) as T
-          const lineOf = (m: number) => {
-            const n = new StaveNote({ keys: [keyOf(m)], duration: 'q', clef })
-            return n.getKeyProps()[0].line // 半格数（treble 从 c/4=0 起）
-          }
-          const yOf = (m: number) => stave.getYForLine(5 - lineOf(m)) // 5 线坐标：0=顶线 4=底线
+      if (slots && clef !== 'none' && svg) {
+        {
           const xStep = (width - 110) / (slots.length - 1)
           const rects: SlotRect[] = slots.map((m, i) => ({ midi: m, x: 76 + i * xStep, y: yOf(m) }))
 
-          // 加线（候选圈落在线外时画对应的小横线）
-          const ledger = (x: number, line: number, color: string) => {
-            const lo = Math.floor(Math.min(line, 1))
-            const hi = Math.ceil(Math.max(line, 5))
-            for (let l = lo; l <= 0; l++) drawLedgerSeg(l)
-            for (let l = 6; l <= hi; l++) drawLedgerSeg(l)
-            function drawLedgerSeg(l: number) {
-              const seg = mk<SVGLineElement>('line')
-              seg.setAttribute('x1', String(x - 15)); seg.setAttribute('x2', String(x + 15))
-              seg.setAttribute('y1', String(stave.getYForLine(5 - l))); seg.setAttribute('y2', String(stave.getYForLine(5 - l)))
-              seg.setAttribute('stroke', color); seg.setAttribute('stroke-width', '1.6')
-              svg.appendChild(seg)
-            }
-          }
-
-          const INK = '#22304A'
           for (const r of rects) {
             const isRight = revealMidi === r.midi
             const isWrong = wrongMidi === r.midi
             const color = isRight ? '#3a7d44' : isWrong ? '#D9534F' : '#B9962F'
             ledger(r.x, lineOf(r.midi), isRight ? '#3a7d44' : INK)
             const c = mk<SVGCircleElement>('circle')
-            c.setAttribute('cx', String(r.x)); c.setAttribute('cy', String(r.y)); c.setAttribute('r', '11')
+            c.setAttribute('cx', String(r.x)); c.setAttribute('cy', String(r.y)); c.setAttribute('r', '5')
             c.setAttribute('fill', isRight ? 'rgba(58,125,68,0.14)' : isWrong ? 'rgba(217,83,79,0.12)' : 'rgba(185,150,47,0.10)')
             c.setAttribute('stroke', color)
-            c.setAttribute('stroke-width', isRight || isWrong ? '2.2' : '1.8')
-            if (!isRight && !isWrong) c.setAttribute('stroke-dasharray', '4 3')
+            c.setAttribute('stroke-width', isRight || isWrong ? '2' : '1.6')
+            if (!isRight && !isWrong) c.setAttribute('stroke-dasharray', '3 2.5')
             c.setAttribute('class', 'slotRing')
             svg.appendChild(c)
           }
@@ -162,20 +180,20 @@ export default function Staff({ clef = 'treble', midi = null, midis, chord = fal
         notes = rhythm.flatMap(tok => tokNotes(tok, midi ?? 71))
       } else if (midis && midis.length > 0) {
         if (chord) {
-          const n = new StaveNote({ keys: midis.map(keyOf), duration: 'w' })
+          const n = new StaveNote({ keys: midis.map(keyOf), duration: 'w', clef: clef === 'none' ? 'treble' : clef })
           midis.forEach((m, i) => {
             if (needsAcc(m)) n.addModifier(new Accidental('#'), i)
           })
           notes = [n]
         } else {
           notes = midis.map(m => {
-            const n = new StaveNote({ keys: [keyOf(m)], duration: 'w' })
+            const n = new StaveNote({ keys: [keyOf(m)], duration: 'w', clef: clef === 'none' ? 'treble' : clef })
             if (needsAcc(m)) n.addModifier(new Accidental('#'), 0)
             return n
           })
         }
-      } else if (midi !== null) {
-        const n = new StaveNote({ keys: [keyOf(midi)], duration: 'w' })
+      } else if (midi !== null && noteX == null) {
+        const n = new StaveNote({ keys: [keyOf(midi)], duration: 'w', clef: clef === 'none' ? 'treble' : clef })
         if (needsAcc(midi)) n.addModifier(new Accidental('#'), 0)
         notes = [n]
       }
@@ -215,7 +233,7 @@ export default function Staff({ clef = 'treble', midi = null, midis, chord = fal
       console.warn('Staff render failed:', e)
     }
     }
-  }, [clef, midi, midis, chord, rhythm, width, height, slots, placedMidi, revealMidi, wrongMidi])
+  }, [clef, midi, midis, chord, rhythm, width, height, slots, placedMidi, revealMidi, wrongMidi, noteX])
 
   return <div ref={ref} className="staffWrap" />
 }
