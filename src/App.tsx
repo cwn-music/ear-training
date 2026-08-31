@@ -682,7 +682,7 @@ export default function App() {
                 clef={q.clef}
                 slots={q.slots}
                 width={320}
-                height={150}
+                height={158}
                 placedMidi={picked !== null ? Number(picked) : null}
                 revealMidi={picked !== null ? q.midi : null}
                 wrongMidi={picked !== null && Number(picked) !== q.midi ? Number(picked) : null}

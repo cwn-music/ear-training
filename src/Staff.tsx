@@ -82,8 +82,8 @@ export default function Staff({ clef = 'treble', midi = null, midis, chord = fal
       renderer.resize(width, height)
       const ctx = renderer.getContext()
       ctx.setFont('Arial', 10)
-      // 摆音符模式抬高谱表，给上加线/下加线的候选圈留位置；闪卡用小画布紧凑布局
-      const stave = new Stave(8, staveY ?? (slots ? 44 : 12), width - 16)
+      // 摆音符模式给上加线/下加线的候选圈留位置；闪卡用小画布紧凑布局
+      const stave = new Stave(8, staveY ?? (slots ? 40 : 12), width - 16)
       if (clef === 'none') {
         // 教材式节奏谱：隐藏五线谱线（保留谱表定位功能），符头排在同一高度
         stave.options.lineConfig.forEach(l => { l.visible = false })
@@ -103,13 +103,12 @@ export default function Staff({ clef = 'treble', midi = null, midis, chord = fal
       }
       const yOf = (m: number) => stave.getYForLine(5 - lineOf(m)) // 5 线坐标：0=顶线 4=底线
       const INK = '#22304A'
-      // 加线（音落在线外时画对应的小横线）
+      // 加线：只画音符真正压着的线。间内的音（如 D4 下加一间）不画；
+      // 线外的音从音符所在整数线一直画到谱边（C4 画下加一线，A3 再带一条）
       const ledger = (x: number, line: number, color: string) => {
         if (!svg) return
-        const lo = Math.floor(Math.min(line, 1))
-        const hi = Math.ceil(Math.max(line, 5))
-        for (let l = lo; l <= 0; l++) drawLedgerSeg(l)
-        for (let l = 6; l <= hi; l++) drawLedgerSeg(l)
+        if (line < 1) for (let l = Math.ceil(line); l <= 0; l++) drawLedgerSeg(l)
+        if (line > 5) for (let l = 6; l <= Math.floor(line); l++) drawLedgerSeg(l)
         function drawLedgerSeg(l: number) {
           const seg = mk<SVGLineElement>('line')
           seg.setAttribute('x1', String(x - 15)); seg.setAttribute('x2', String(x + 15))
