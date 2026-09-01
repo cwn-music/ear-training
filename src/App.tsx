@@ -125,6 +125,8 @@ export default function App() {
   const [picked, setPicked] = useState<string | null>(null)
   const [score, setScore] = useState(0)
   const [singing, setSinging] = useState(false)
+  // 跟唱结果：null=还在听；ok/heard 用于停留反馈（唱对要夸，唱错要对比）
+  const [singResult, setSingResult] = useState<{ ok: boolean; heard: number | null } | null>(null)
   const [placementStage, setPlacementStage] = useState(0)
   const [placementHit, setPlacementHit] = useState(0)
   const [zooming, setZooming] = useState(false)
@@ -159,6 +161,7 @@ export default function App() {
     setScore(0)
     setPicked(null)
     setSinging(false)
+    setSingResult(null)
     setSessionLog([])
     setReviewMode(false)
     setPhase('playing')
@@ -182,6 +185,7 @@ export default function App() {
     setScore(0)
     setPicked(null)
     setSinging(false)
+    setSingResult(null)
     setSessionLog([])
     setReviewMode(true)
     setPhase('playing')
@@ -203,6 +207,7 @@ export default function App() {
     setQi(0)
     setPicked(null)
     setSinging(false)
+    setSingResult(null)
     setSessionLog([])
     setReviewMode(false)
     setPhase('playing')
@@ -458,16 +463,29 @@ export default function App() {
     // 识音题答对后进入跟唱
     const needSing = ok && q.kind === 'pitch' && !isPlacement && !singing
 
-    // 答错：停留更久，短内容的题自动重播一遍，对照高亮的正确答案
+    // 模唱题：麦克风评测刚结束，反馈停住不自动跳题，由学习者自己点「下一题」
+    if (q.kind === 'sing') {
+      if (!ok) window.setTimeout(() => playQuestion(q), 600) // 唱错：自动重播一遍示范
+      return
+    }
+
+    // 答错：停留更久。识音/识谱题先后播放「你选的 → 正确的」做对比；
+    // 其余短内容的题自动重播一遍，对照高亮的正确答案
     if (!ok && !isPlacement && !LONG_KINDS.includes(q.kind)) {
-      window.setTimeout(() => playQuestion(q), 750)
+      if (q.kind === 'pitch' || q.kind === 'sight') {
+        const wrongMidi = Number(id)
+        window.setTimeout(() => playTwo(wrongMidi, q.midi, { da: 0.9, db: 0.9, gap: 0.6 }), 600)
+      } else {
+        window.setTimeout(() => playQuestion(q), 750)
+      }
     }
     const dwell = ok
       ? (needSing ? 900 : 1200)
-      : isPlacement ? 2000 : LONG_KINDS.includes(q.kind) ? 3600 : 3200
+      : isPlacement ? 2000 : (q.kind === 'pitch' || q.kind === 'sight') ? 4200 : LONG_KINDS.includes(q.kind) ? 3600 : 3200
 
     setTimeout(() => {
       if (needSing) {
+        setSingResult(null)
         setSinging(true)
         return
       }
@@ -477,6 +495,7 @@ export default function App() {
 
   const advance = (ok: boolean, nextScore: number) => {
     setSinging(false)
+    setSingResult(null)
     setPicked(null)
     const isPlacement = questions.length === 3
     if (isPlacement) {
@@ -518,8 +537,17 @@ export default function App() {
     }
   }
 
-  const singDone = (_ok: boolean) => {
-    advance(true, score)
+  // 跟唱结束：不立刻跳题，停住给明确反馈
+  // 唱错时自动做一次对比播放——先播你唱的，再播正确的
+  const singDone = (ok: boolean, heard: number | null = null) => {
+    if (!q || q.kind !== 'pitch') return
+    setSingResult({ ok, heard })
+    if (!ok) {
+      window.setTimeout(() => {
+        if (heard !== null && heard !== q.midi) playTwo(heard, q.midi, { da: 0.9, db: 0.9, gap: 0.6 })
+        else playNote(q.midi, 1.2, 0.9)
+      }, 450)
+    }
   }
 
   // 点击封面：放大海螺 → 进入学习地图
@@ -763,23 +791,36 @@ export default function App() {
           {picked !== null && (
             <div className={'feedback ' + (isCorrect(q, picked) ? 'ok' : 'no')}>
               {isCorrect(q, picked) ? (
-                '答对了'
+                q.kind === 'sing' ? '答对了！三个音都唱准了' : '答对了'
               ) : (
                 <>
                   <div className="fbDiag">{diagnosisOf(q, picked)}</div>
                   <div className="fbAnswer">
                     {q.kind === 'sing'
-                      ? '示范随时可以重听，下一题继续加油'
+                      ? '示范已自动重播一遍，跟熟了再点下方按钮继续'
                       : q.kind === 'place'
                         ? `正确答案：${answerLabelOf(q)}（谱面上标绿的位置）`
                         : q.kind === 'fill'
                           ? `正确答案：${answerLabelOf(q)}（琴键上已亮出，声音会再播一遍）`
-                          : `正确答案：${answerLabelOf(q)}（已标绿${!LONG_KINDS.includes(q.kind) && questions.length !== 3 ? '，声音会再播一遍' : ''}）`}
+                          : q.kind === 'pitch' || q.kind === 'sight'
+                            ? `正确答案：${answerLabelOf(q)}（已标绿，先后播放你选的和正确的音）`
+                            : `正确答案：${answerLabelOf(q)}（已标绿${!LONG_KINDS.includes(q.kind) && questions.length !== 3 ? '，声音会再播一遍' : ''}）`}
                   </div>
                 </>
               )}
               {q.kind === 'pitchcmp' && level <= 4 && (
                 <Piano highlight={[q.a, q.b]} marks={{ [q.a]: '①', [q.b]: '②' }} from={Math.min(q.a, q.b) - 3} to={Math.max(q.a, q.b) + 3} label={false} />
+              )}
+              {q.kind === 'sing' && (
+                <div className="singNextRow">
+                  {!isCorrect(q, picked) && (
+                    <button className="btn ghost small" onClick={() => playQuestion(q)}>▶ 再听一遍示范</button>
+                  )}
+                  <button className="btn primary" onClick={() => advance(isCorrect(q, picked), score)}>
+                    {qi + 1 < questions.length ? '下一题 ›' : '查看成绩 ›'
+                    }
+                  </button>
+                </div>
               )}
             </div>
           )}
@@ -787,16 +828,71 @@ export default function App() {
       ) : (
         q.kind === 'pitch' && (
           <div className="singBox">
-            <p>答对了！跟着把它唱出来：</p>
-            <Staff clef="treble" midi={q.midi} width={260} />
-            <div className="staffBox">
-              <Piano highlight={[q.midi]} from={Math.min(60, q.midi)} to={Math.max(71, q.midi)} />
-            </div>
-            <button className="btn ghost" onClick={() => { void ensureAudio().then(() => playNote(q.midi, 1.2, 0.9)) }}>
-              ▶ 再听一遍
-            </button>
-            <Sing target={q.midi} ghostMic={new URLSearchParams(location.search).has('ghostMic')} onDone={singDone} />
-            <button className="btn ghost small" onClick={() => singDone(true)}>跳过跟唱</button>
+            {singResult === null ? (
+              <>
+                <p>答对了！跟着把它唱出来：</p>
+                <Staff clef="treble" midi={q.midi} width={260} />
+                <div className="staffBox">
+                  <Piano highlight={[q.midi]} from={Math.min(60, q.midi)} to={Math.max(71, q.midi)} />
+                </div>
+                <button className="btn ghost" onClick={() => { void ensureAudio().then(() => playNote(q.midi, 1.2, 0.9)) }}>
+                  ▶ 再听一遍
+                </button>
+                <Sing target={q.midi} ghostMic={new URLSearchParams(location.search).has('ghostMic')} onDone={singDone} />
+                <button className="btn ghost small" onClick={() => advance(true, score)}>跳过跟唱</button>
+              </>
+            ) : singResult.ok ? (
+              <>
+                <p>跟着唱一遍：</p>
+                <Staff clef="treble" midi={q.midi} width={260} />
+                <div className="feedback ok">
+                  <div className="fbDiag">唱对了！</div>
+                  <div className="fbAnswer">{displayName(q.midi)} 这个音，听得准、也唱得准了</div>
+                </div>
+                <button className="btn primary big" onClick={() => advance(true, score)}>
+                  {qi + 1 < questions.length ? '下一题 ›' : '查看成绩 ›'}
+                </button>
+              </>
+            ) : (
+              <>
+                <p>跟着唱一遍：</p>
+                <Staff clef="treble" midi={q.midi} width={260} />
+                <div className="feedback no">
+                  <div className="fbDiag">
+                    {singResult.heard === null
+                      ? '这次没听清你的声音'
+                      : singResult.heard === q.midi
+                        ? `你已经唱到 ${displayName(q.midi)} 了，只是没稳住`
+                        : singResult.heard % 12 === q.midi % 12
+                          ? `音名唱对了，只是高低差了一个八度`
+                          : `你唱的是 ${displayName(singResult.heard)}，目标是 ${displayName(q.midi)}`}
+                  </div>
+                  <div className="fbAnswer">
+                    {singResult.heard === null
+                      ? `正确的音是 ${displayName(q.midi)}，再听一遍，跟着哼一哼`
+                      : singResult.heard === q.midi
+                        ? '再唱一次，把音拉长、稳住就算数'
+                        : '已先后播放你唱的和正确的音，听听差在哪'}
+                  </div>
+                </div>
+                <div>
+                  <button className="btn ghost small" onClick={() => { void ensureAudio().then(() => playNote(q.midi, 1.2, 0.9)) }}>
+                    ▶ 听正确的
+                  </button>
+                  {singResult.heard !== null && singResult.heard !== q.midi && (
+                    <button className="btn ghost small" onClick={() => { void ensureAudio().then(() => playTwo(singResult.heard!, q.midi, { da: 0.9, db: 0.9, gap: 0.6 })) }}>
+                      ▶ 对比再听
+                    </button>
+                  )}
+                </div>
+                <button className="btn primary" onClick={() => setSingResult(null)}>再唱一次</button>
+                <div>
+                  <button className="btn ghost small" onClick={() => advance(true, score)}>
+                    {qi + 1 < questions.length ? '先去下一题 ›' : '先去看成绩 ›'}
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         )
       )}

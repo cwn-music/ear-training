@@ -6,7 +6,7 @@ import { displayName } from './theory'
 interface Props {
   target: number
   ghostMic?: boolean // 冒烟测试：不申请麦克风，直接成功
-  onDone: (ok: boolean) => void
+  onDone: (ok: boolean, heard?: number | null) => void
 }
 
 const CLARITY = 0.9
@@ -22,6 +22,8 @@ export default function Sing({ target, ghostMic = false, onDone }: Props) {
   const doneRef = useRef(false)
   const onDoneRef = useRef(onDone)
   onDoneRef.current = onDone
+  // 听到的音按次数记账：唱错时取出「唱得最多的那个音」做正误对比
+  const heardCount = useRef(new Map<number, number>())
 
   useEffect(() => {
     if (ghostMic) {
@@ -48,7 +50,12 @@ export default function Sing({ target, ghostMic = false, onDone }: Props) {
       if (timer) clearTimeout(timer)
       stream?.getTracks().forEach(t => t.stop())
       void ctx?.close().catch(() => undefined)
-      onDoneRef.current(ok)
+      let top: number | null = null
+      let topN = 0
+      heardCount.current.forEach((n, m) => {
+        if (n > topN) { topN = n; top = m }
+      })
+      onDoneRef.current(ok, top)
     }
 
     const run = async () => {
@@ -75,7 +82,9 @@ export default function Sing({ target, ghostMic = false, onDone }: Props) {
         const [freq, clarity] = detector.findPitch(buf, ctx!.sampleRate)
         if (clarity > CLARITY && freq > 50 && freq < 1200) {
           const m = midiOfFreq(freq)
-          setHeard(Math.round(m))
+          const r = Math.round(m)
+          setHeard(r)
+          heardCount.current.set(r, (heardCount.current.get(r) ?? 0) + 1)
           const diff = (((m - target) % 12) + 18) % 12 - 6 // 折叠到 ±6 半音
           if (Math.abs(diff) <= TOL) {
             streak++

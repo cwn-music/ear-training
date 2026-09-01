@@ -1,5 +1,5 @@
-// 缪斯 Muse · 学习页（概念卡 + 范听）
-import { useEffect, useState, type ReactNode } from 'react'
+// 缪斯 Muse · 学习页（概念卡 + 范听，一张卡一页逐页翻）
+import { Children, Fragment, isValidElement, useEffect, useState, type ReactNode, type ReactElement } from 'react'
 import { lessonOf, INSTRUMENTS } from './lessons'
 import { ensureAudio, playMelody, playRhythm, playTwo, initInstruments, playInstrumentMelody, playNote } from './audio'
 import { INTERVAL_NAMES, displayName, type Clef } from './theory'
@@ -30,7 +30,7 @@ const INTERVAL_DESCS: Record<number, string> = {
 
 // 新题型第一次出现的课：开练前先看「怎么答题」，答错成本降为零
 const HOWTO: Record<number, string[]> = {
-  1: ['先听播放的音，同时琴键上会亮出它的位置', '在选项里点它的名字（do / re / mi）', '答错也没关系：正确答案会标绿，还会再播一遍'],
+  1: ['先听播放的音，同时琴键上会亮出它的位置', '在选项里点它的名字（do / re / mi）', '答错也没关系：正确答案会标绿，还会把你选的和正确的先后播一遍对比'],
   2: ['会先后播放两个音', '判断第二个音比第一个更高还是更低，点对应按钮', '不确定就点「再听一遍」，不限次数'],
   3: ['会先后播放两个音', '判断第二个音更长还是更短'],
   4: ['会先后播放两个音', '判断第二个音更响还是更轻'],
@@ -45,6 +45,19 @@ const HOWTO: Record<number, string[]> = {
   15: ['低音谱表的题和高音谱表一样做，只是起点不同', '「摆音符」与「对不对」题会帮你熟悉新地图'],
   19: ['听一串音阶', '大调明亮、小调柔和，关键差别在第三个音'],
   21: ['识谱与旋律题和以前一样', '「开口唱」题：听三个音，跟着唱出来，唱准一个亮一个', '会用到麦克风，点允许就好；不方便唱可以跳过'],
+}
+
+// 各课的 renderBody 返回的是 Fragment，Children 工具看不穿它，手动摊平成一卡一项
+function flattenCards(node: ReactNode): ReactNode[] {
+  const out: ReactNode[] = []
+  Children.forEach(node, child => {
+    if (isValidElement(child) && child.type === Fragment) {
+      out.push(...flattenCards((child as ReactElement<{ children?: ReactNode }>).props.children))
+    } else if (child !== null && child !== undefined && typeof child !== 'boolean') {
+      out.push(child)
+    }
+  })
+  return out
 }
 
 function Card({ title, children }: { title: string; children: ReactNode }) {
@@ -110,6 +123,7 @@ function Flashcards({ clef, notes }: { clef: Clef; notes: number[] }) {
 
 export default function Learn({ lessonId, onStart, onBack }: Props) {
   const lesson = lessonOf(lessonId)
+  const [page, setPage] = useState(0)
 
   useEffect(() => {
     if (lessonId === 12) void initInstruments()
@@ -399,20 +413,58 @@ export default function Learn({ lessonId, onStart, onBack }: Props) {
     }
   }
 
+  // 一课的讲解卡收成一个序列：「怎么答题」在最前，后面是各概念卡
+  // 一张卡一页地翻，不再全部堆在同一屏
+  const cards: ReactNode[] = []
+  if (HOWTO[lessonId]) {
+    cards.push(
+      <Card title="怎么答题">
+        <ol className="howtoList">
+          {HOWTO[lessonId].map(s => <li key={s}>{s}</li>)}
+        </ol>
+      </Card>,
+    )
+  }
+  cards.push(...flattenCards(renderBody()))
+
+  const total = cards.length
+  const cur = Math.min(page, Math.max(0, total - 1))
+  const goto = (p: number) => {
+    setPage(p)
+    window.scrollTo(0, 0)
+  }
+
   return (
     <div className="learnPage">
       <button className="backLink" onClick={onBack}>‹ 返回地图</button>
       <h2>第 {lesson.id} 课 · {lesson.title}</h2>
       <p className="goal">{lesson.goal}</p>
-      {HOWTO[lessonId] && (
-        <Card title="怎么答题">
-          <ol className="howtoList">
-            {HOWTO[lessonId].map(s => <li key={s}>{s}</li>)}
-          </ol>
-        </Card>
+      {total > 1 && (
+        <div className="learnDots">
+          {cards.map((_, i) => (
+            <span key={i} className={'learnDot' + (i === cur ? ' now' : i < cur ? ' done' : '')} />
+          ))}
+        </div>
       )}
-      {renderBody()}
-      <button className="btn primary big" onClick={onStart}>开始练习</button>
+      {/* 所有卡常驻、只切显隐：闪卡翻面、词典播放等状态翻页不丢 */}
+      <div className="learnPages">
+        {cards.map((c, i) => (
+          <div key={i} hidden={i !== cur}>{c}</div>
+        ))}
+      </div>
+      {total > 1 && (
+        <div className="learnNav">
+          {cur > 0
+            ? <button className="btn ghost" onClick={() => goto(cur - 1)}>‹ 上一张</button>
+            : <span className="learnNavGap" />}
+          {cur < total - 1 && (
+            <button className="btn primary" onClick={() => goto(cur + 1)}>下一张 ›</button>
+          )}
+        </div>
+      )}
+      {(total === 1 || cur === total - 1) && (
+        <button className="btn primary big" onClick={onStart}>开始练习</button>
+      )}
     </div>
   )
 }
