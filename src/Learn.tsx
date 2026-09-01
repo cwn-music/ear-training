@@ -6,6 +6,7 @@ import { INTERVAL_NAMES, displayName, type Clef } from './theory'
 import Staff from './Staff'
 import Piano from './Piano'
 import RhythmDict, { COMBO_ENTRIES } from './RhythmDict'
+import HowToDemo, { LESSON_DEMOS } from './HowToDemo'
 
 interface Props {
   lessonId: number
@@ -419,6 +420,7 @@ export default function Learn({ lessonId, onStart, onBack }: Props) {
   if (HOWTO[lessonId]) {
     cards.push(
       <Card title="怎么答题">
+        {LESSON_DEMOS[lessonId] && <HowToDemo demos={LESSON_DEMOS[lessonId]} />}
         <ol className="howtoList">
           {HOWTO[lessonId].map(s => <li key={s}>{s}</li>)}
         </ol>
