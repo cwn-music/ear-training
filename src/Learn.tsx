@@ -156,8 +156,7 @@ export default function Learn({ lessonId, onStart, onBack }: Props) {
         return (
           <>
             <Card title="认识琴键">
-              <p>钢琴的白键七个一组，依次是 do re mi fa sol la si。</p>
-              <p>今天只认识最前面的三个。点一点，听听它们的声音：</p>
+              <p>今天认识三个白键：do、re、mi。点一点，听听它们的声音：</p>
               <Piano interactive highlight={[60, 62, 64]} from={60} to={64} />
             </Card>
             <Card title="今天要练">
@@ -219,6 +218,7 @@ export default function Learn({ lessonId, onStart, onBack }: Props) {
               <Staff clef="treble" midi={60} width={300} />
             </Card>
             <Card title="单音卡片 · 每个位置认一认">
+              <p>今天要认识四位新朋友：fa、sol、la、si，还有高高的 do。</p>
               <p>一个卡片一个位置。先看着音符说出它的名字，再点开对答案——顺便听一听它的声音。</p>
               <Flashcards clef="treble" notes={[60, 62, 64, 65, 67, 69, 71, 72]} />
             </Card>
