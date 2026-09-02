@@ -125,6 +125,7 @@ export default function App() {
   const [picked, setPicked] = useState<string | null>(null)
   const [score, setScore] = useState(0)
   const [singing, setSinging] = useState(false)
+  const [singArmed, setSingArmed] = useState(false) // 跟唱是否已开始听音（孩子点「开始跟唱」后才开麦）
   // 跟唱结果：null=还在听；ok/heard 用于停留反馈（唱对要夸，唱错要对比）
   const [singResult, setSingResult] = useState<{ ok: boolean; heard: number | null } | null>(null)
   // 跟唱中实时听到的音（谱面光条用，null=收起来）
@@ -165,6 +166,7 @@ export default function App() {
     setScore(0)
     setPicked(null)
     setSinging(false)
+    setSingArmed(false)
     setSingResult(null)
     setLiveHeard(null)
     setSessionLog([])
@@ -191,6 +193,7 @@ export default function App() {
     setScore(0)
     setPicked(null)
     setSinging(false)
+    setSingArmed(false)
     setSingResult(null)
     setLiveHeard(null)
     setSessionLog([])
@@ -215,6 +218,7 @@ export default function App() {
     setQi(0)
     setPicked(null)
     setSinging(false)
+    setSingArmed(false)
     setSingResult(null)
     setLiveHeard(null)
     setSessionLog([])
@@ -495,6 +499,7 @@ export default function App() {
       if (needSing) {
         setSingResult(null)
         setLiveHeard(null)
+        setSingArmed(false) // 先停住，等孩子自己点「开始跟唱」
         setSinging(true)
         return
       }
@@ -504,6 +509,7 @@ export default function App() {
 
   const advance = (ok: boolean, nextScore: number) => {
     setSinging(false)
+    setSingArmed(false)
     setSingResult(null)
     setLiveHeard(null)
     setPicked(null)
@@ -867,21 +873,30 @@ export default function App() {
                 <p>答对了！跟着把它唱出来：</p>
                 <div className="singLiveWrap">
                   <Staff clef="treble" midi={q.midi} width={260} />
-                  {liveHeard !== null && (() => {
+                  {singArmed && liveHeard !== null && (() => {
                     const y = Math.max(4, Math.min(116, noteYOnStaff(liveHeard, 'treble', 12)))
                     const diff = (((liveHeard - q.midi) % 12) + 18) % 12 - 6
                     return <span className={'pitchBar' + (Math.abs(diff) <= 0.75 ? ' ok' : '')} style={{ top: y }} />
                   })()}
                 </div>
-                <p className="liveTip">金色光条跟着你的声音走——对齐谱上的音符、变成绿色，就是唱准了</p>
+                {singArmed && <p className="liveTip">金色光条跟着你的声音走——对齐谱上的音符、变成绿色，就是唱准了</p>}
                 <div className="staffBox">
                   <Piano highlight={[q.midi]} from={level <= 2 ? 60 : Math.min(60, q.midi)} to={level <= 2 ? 64 : Math.max(71, q.midi)} />
                 </div>
                 <button className="btn ghost" onClick={() => { void ensureAudio().then(() => playNote(q.midi, 1.2, 0.9)) }}>
                   ▶ 再听一遍
                 </button>
-                <Sing target={q.midi} ghostMic={new URLSearchParams(location.search).has('ghostMic')} onDone={singDone} onHear={setLiveHeard} />
-                <button className="btn ghost small" onClick={() => advance(true, score)}>跳过跟唱</button>
+                {singArmed ? (
+                  <>
+                    <Sing target={q.midi} ghostMic={new URLSearchParams(location.search).has('ghostMic')} onDone={singDone} onHear={setLiveHeard} />
+                    <button className="btn ghost small" onClick={() => advance(true, score)}>跳过跟唱</button>
+                  </>
+                ) : (
+                  <>
+                    <button className="btn primary big" onClick={() => setSingArmed(true)}>🎤 开始跟唱</button>
+                    <button className="btn ghost small" onClick={() => advance(true, score)}>跳过跟唱</button>
+                  </>
+                )}
               </>
             ) : singResult.ok ? (
               <>
