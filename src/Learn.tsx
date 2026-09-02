@@ -1,5 +1,5 @@
 // 缪斯 Muse · 学习页（概念卡 + 范听，一张卡一页逐页翻）
-import { Children, Fragment, isValidElement, useEffect, useState, type ReactNode, type ReactElement } from 'react'
+import { Children, Fragment, isValidElement, useEffect, useRef, useState, type ReactNode, type ReactElement } from 'react'
 import { lessonOf, INSTRUMENTS } from './lessons'
 import { ensureAudio, playMelody, playRhythm, playTwo, initInstruments, playInstrumentMelody, playNote } from './audio'
 import { INTERVAL_NAMES, displayName, type Clef } from './theory'
@@ -31,7 +31,7 @@ const INTERVAL_DESCS: Record<number, string> = {
 
 // 新题型第一次出现的课：开练前先看「怎么答题」，答错成本降为零
 const HOWTO: Record<number, string[]> = {
-  1: ['先听播放的音，同时琴键上会亮出它的位置', '在选项里点它的名字（do / re / mi）', '答错也没关系：正确答案会标绿，还会把你选的和正确的先后播一遍对比'],
+  1: ['先听播放的音，同时琴键上会亮出它的位置', '在选项里点它的名字（do / re / mi）', '答错也没关系：正确答案会标绿，点按钮就能听你选的和正确的，对比好了再进下一题'],
   2: ['会先后播放两个音', '判断第二个音比第一个更高还是更低，点对应按钮', '不确定就点「再听一遍」，不限次数'],
   3: ['会先后播放两个音', '判断第二个音更长还是更短'],
   4: ['会先后播放两个音', '判断第二个音更响还是更轻'],
@@ -100,6 +100,26 @@ function IntervalCard({ semis }: { semis: number }) {
   )
 }
 
+// 「今天要练」的试听琴键：点哪个键，哪个键亮、同时发它的音（声音↔位置绑定）
+function ListenKeys({ notes }: { notes: number[] }) {
+  const [ring, setRing] = useState<number | null>(null)
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(() => () => { if (timer.current) clearTimeout(timer.current) }, [])
+  return (
+    <Piano
+      interactive
+      from={notes[0]}
+      to={notes[notes.length - 1]}
+      highlight={ring !== null ? [ring] : []}
+      onPick={m => {
+        setRing(m)
+        if (timer.current) clearTimeout(timer.current)
+        timer.current = setTimeout(() => setRing(null), 1300)
+      }}
+    />
+  )
+}
+
 // 单音闪卡：一张卡一个谱面位置，先自己说名字，再点开对答案（同时听声音）
 function Flashcards({ clef, notes }: { clef: Clef; notes: number[] }) {
   const [flipped, setFlipped] = useState<Record<number, boolean>>({})
@@ -137,14 +157,12 @@ export default function Learn({ lessonId, onStart, onBack }: Props) {
           <>
             <Card title="认识琴键">
               <p>钢琴的白键七个一组，依次是 do re mi fa sol la si。</p>
-              <p>点一点琴键，听听它们的声音：</p>
-              <Piano interactive highlight={[60, 62, 64]} />
+              <p>今天只认识最前面的三个。点一点，听听它们的声音：</p>
+              <Piano interactive highlight={[60, 62, 64]} from={60} to={64} />
             </Card>
             <Card title="今天要练">
-              <p>只认三个音：do re mi。听一听声音、看一看位置、说一说名字。</p>
-              <PlayBtn label="do" onPlay={() => playNote(60)} />
-              <PlayBtn label="re" onPlay={() => playNote(62)} />
-              <PlayBtn label="mi" onPlay={() => playNote(64)} />
+              <p>只认三个音：do re mi。点琴键听一听，看着它的位置，说一说名字。</p>
+              <ListenKeys notes={[60, 62, 64]} />
             </Card>
           </>
         )

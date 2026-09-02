@@ -57,14 +57,16 @@ function Waves() {
   return <span className="dmWaves"><i /><i /><i /></span>
 }
 
-// 迷你钢琴（7 白 5 黑简笔）
-function MiniPiano({ glowKey = -1, flashKey = -1, top }: { glowKey?: number; flashKey?: number; top: number }) {
+// 迷你钢琴（简笔；keys=3 时只画 do re mi 三个白键，第 1 课用）
+function MiniPiano({ glowKey = -1, flashKey = -1, top, keys = 7 }: { glowKey?: number; flashKey?: number; top: number; keys?: number }) {
+  const width = keys === 3 ? 80 : 182
+  const blackX = keys === 3 ? [20, 47] : [19, 45, 97, 123, 149]
   return (
-    <div className="dmPiano" style={{ top }}>
-      {[0, 1, 2, 3, 4, 5, 6].map(i => (
+    <div className="dmPiano" style={{ top, width }}>
+      {Array.from({ length: keys }, (_, i) => (
         <span key={i} className={'dmW' + (i === glowKey ? ' dmKeyGlow' : '') + (i === flashKey ? ' dmKeyFlash' : '')} />
       ))}
-      {[19, 45, 97, 123, 149].map(x => <span key={x} className="dmB" style={{ left: x }} />)}
+      {blackX.map(x => <span key={x} className="dmB" style={{ left: x }} />)}
     </div>
   )
 }
@@ -86,11 +88,11 @@ function Mark({ x, y, children }: { x: string; y: number; children: ReactNode })
 
 function DemoStage({ kind }: { kind: DemoKind }) {
   switch (kind) {
-    // 听音 → 琴键亮 → 点名字
+    // 听音 → 琴键亮 → 点名字（第 1 课只有 do re mi 三个键）
     case 'pitch':
       return (
         <>
-          <MiniPiano glowKey={0} top={16} />
+          <MiniPiano glowKey={0} top={16} keys={3} />
           <span className="dmSound" style={{ right: 14, top: 10 }}><Waves /></span>
           <Chip at="22%" hit>do</Chip>
           <Chip at="50%">re</Chip>

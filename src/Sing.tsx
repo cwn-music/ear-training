@@ -7,6 +7,7 @@ interface Props {
   target: number
   ghostMic?: boolean // 冒烟测试：不申请麦克风，直接成功
   onDone: (ok: boolean, heard?: number | null) => void
+  onHear?: (midi: number | null) => void // 实时汇报听到的音（谱面光条用）
 }
 
 const CLARITY = 0.9
@@ -16,12 +17,14 @@ const TIMEOUT_MS = 12000
 
 const midiOfFreq = (f: number) => 69 + 12 * Math.log2(f / 440)
 
-export default function Sing({ target, ghostMic = false, onDone }: Props) {
+export default function Sing({ target, ghostMic = false, onDone, onHear }: Props) {
   const [heard, setHeard] = useState<number | null>(null)
   const [state, setState] = useState<'init' | 'listening' | 'done'>('init')
   const doneRef = useRef(false)
   const onDoneRef = useRef(onDone)
   onDoneRef.current = onDone
+  const onHearRef = useRef(onHear)
+  onHearRef.current = onHear
   // 听到的音按次数记账：唱错时取出「唱得最多的那个音」做正误对比
   const heardCount = useRef(new Map<number, number>())
 
@@ -42,6 +45,9 @@ export default function Sing({ target, ghostMic = false, onDone }: Props) {
     let timer: ReturnType<typeof setTimeout> | null = null
     let cancelled = false
     let streak = 0
+    // 光条汇报：音变才上报；短暂听不清（<300ms）不急着收光条，避免闪烁
+    let lastSent: number | null = null
+    let lastClearAt = 0
 
     const finish = (ok: boolean) => {
       if (doneRef.current) return
@@ -85,6 +91,11 @@ export default function Sing({ target, ghostMic = false, onDone }: Props) {
           const r = Math.round(m)
           setHeard(r)
           heardCount.current.set(r, (heardCount.current.get(r) ?? 0) + 1)
+          lastClearAt = performance.now()
+          if (lastSent !== r) {
+            lastSent = r
+            onHearRef.current?.(r)
+          }
           const diff = (((m - target) % 12) + 18) % 12 - 6 // 折叠到 ±6 半音
           if (Math.abs(diff) <= TOL) {
             streak++
@@ -97,6 +108,10 @@ export default function Sing({ target, ghostMic = false, onDone }: Props) {
           }
         } else {
           streak = 0
+          if (lastSent !== null && performance.now() - lastClearAt > 300) {
+            lastSent = null
+            onHearRef.current?.(null)
+          }
         }
         raf = requestAnimationFrame(loop)
       }

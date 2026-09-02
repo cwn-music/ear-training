@@ -576,6 +576,24 @@ h1, h2, h3 { font-weight: 600; color: var(--slate); }
 /* —— 答错反馈：诊断句 + 答案提示 —— */
 .fbDiag { font-weight: 600; }
 .fbAnswer { font-size: 0.875rem; opacity: 0.85; margin-top: 4px; }
+/* 答错后的操作行：听你选的 / 听正确的 / 下一题 */
+.fbActions { margin-top: 10px; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+
+/* —— 跟唱实时音高光条 —— */
+.singLiveWrap { position: relative; width: fit-content; margin: 0 auto; }
+.pitchBar {
+  position: absolute;
+  left: 10px; right: 10px;
+  height: 12px;
+  transform: translateY(-50%);
+  border-radius: 6px;
+  background: rgba(242, 201, 76, 0.35);
+  border: 1.5px solid rgba(185, 150, 47, 0.85);
+  transition: top 0.09s linear;
+  pointer-events: none;
+}
+.pitchBar.ok { background: rgba(107, 191, 89, 0.3); border-color: #3a7d44; }
+.liveTip { text-align: center; font-size: 0.84375rem; color: #8a94a6; margin: 2px 0 6px; }
 /* 模唱反馈后的操作行：再听示范 / 下一题 */
 .singNextRow { margin-top: 10px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 
