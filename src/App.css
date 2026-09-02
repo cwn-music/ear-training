@@ -375,6 +375,7 @@ h1, h2, h3 { font-weight: 600; color: var(--slate); }
   padding: 12px 14px;
   border-radius: 10px;
   font-size: 1.0625rem;
+  animation: dmIn 0.3s ease both;
 }
 .feedback.ok { background: #eef7ec; color: #2c662d; }
 .feedback.no { background: #fbecec; color: #8a2724; }
@@ -593,7 +594,14 @@ h1, h2, h3 { font-weight: 600; color: var(--slate); }
   pointer-events: none;
 }
 .pitchBar.ok { background: rgba(107, 191, 89, 0.3); border-color: #3a7d44; }
+/* 唱对瞬间的定格：光条钉在目标音符上，轻轻脉动 */
+.pitchBar.lock { animation: pitchLock 0.8s ease-in-out infinite; background: rgba(107, 191, 89, 0.42); box-shadow: 0 0 10px rgba(107, 191, 89, 0.45); }
+@keyframes pitchLock {
+  0%, 100% { transform: translateY(-50%) scaleY(1); }
+  50% { transform: translateY(-50%) scaleY(1.35); }
+}
 .liveTip { text-align: center; font-size: 0.84375rem; color: #8a94a6; margin: 2px 0 6px; }
+.singYay { color: #3a7d44; font-weight: 600; font-size: 0.9375rem; animation: dmIn 0.25s ease both; }
 /* 模唱反馈后的操作行：再听示范 / 下一题 */
 .singNextRow { margin-top: 10px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 

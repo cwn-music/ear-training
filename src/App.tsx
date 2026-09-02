@@ -126,6 +126,7 @@ export default function App() {
   const [score, setScore] = useState(0)
   const [singing, setSinging] = useState(false)
   const [singArmed, setSingArmed] = useState(false) // 跟唱是否已开始听音（孩子点「开始跟唱」后才开麦）
+  const [singHold, setSingHold] = useState(false) // 唱对瞬间的定格庆祝（光条钉在音符上）
   // 跟唱结果：null=还在听；ok/heard 用于停留反馈（唱对要夸，唱错要对比）
   const [singResult, setSingResult] = useState<{ ok: boolean; heard: number | null } | null>(null)
   // 跟唱中实时听到的音（谱面光条用，null=收起来）
@@ -167,6 +168,7 @@ export default function App() {
     setPicked(null)
     setSinging(false)
     setSingArmed(false)
+    setSingHold(false)
     setSingResult(null)
     setLiveHeard(null)
     setSessionLog([])
@@ -194,6 +196,7 @@ export default function App() {
     setPicked(null)
     setSinging(false)
     setSingArmed(false)
+    setSingHold(false)
     setSingResult(null)
     setLiveHeard(null)
     setSessionLog([])
@@ -219,6 +222,7 @@ export default function App() {
     setPicked(null)
     setSinging(false)
     setSingArmed(false)
+    setSingHold(false)
     setSingResult(null)
     setLiveHeard(null)
     setSessionLog([])
@@ -508,8 +512,10 @@ export default function App() {
   }
 
   const advance = (ok: boolean, nextScore: number) => {
+    if (singHoldTimer.current) { clearTimeout(singHoldTimer.current); singHoldTimer.current = null } // 定格期间点了跳过/下一题：取消定格
     setSinging(false)
     setSingArmed(false)
+    setSingHold(false)
     setSingResult(null)
     setLiveHeard(null)
     setPicked(null)
@@ -554,8 +560,21 @@ export default function App() {
   }
 
   // 跟唱结束：不立刻跳题，停住给明确反馈；唱错时播一遍对比（你唱的 → 正确的）
+  // 唱对时先定格 1.6s：光条钉在目标音符上变绿 +「对准了！」，让孩子看到成功的一刻，再切结果卡
+  const singHoldTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const singDone = (ok: boolean, heard: number | null = null) => {
     if (!q || q.kind !== 'pitch') return
+    if (ok) {
+      setLiveHeard(q.midi) // 光条钉在目标音上（diff=0 → 绿色）
+      setSingHold(true)
+      singHoldTimer.current = setTimeout(() => {
+        singHoldTimer.current = null
+        setSingHold(false)
+        setLiveHeard(null)
+        setSingResult({ ok: true, heard })
+      }, 1600)
+      return
+    }
     setLiveHeard(null)
     setSingResult({ ok, heard })
     if (!ok) {
@@ -876,10 +895,12 @@ export default function App() {
                   {singArmed && liveHeard !== null && (() => {
                     const y = Math.max(4, Math.min(116, noteYOnStaff(liveHeard, 'treble', 12)))
                     const diff = (((liveHeard - q.midi) % 12) + 18) % 12 - 6
-                    return <span className={'pitchBar' + (Math.abs(diff) <= 0.75 ? ' ok' : '')} style={{ top: y }} />
+                    return <span className={'pitchBar' + (Math.abs(diff) <= 0.75 ? ' ok' : '') + (singHold ? ' lock' : '')} style={{ top: y }} />
                   })()}
                 </div>
-                {singArmed && <p className="liveTip">金色光条跟着你的声音走——对齐谱上的音符、变成绿色，就是唱准了</p>}
+                {singArmed && (singHold
+                  ? <p className="liveTip singYay">对准了！唱得真好听</p>
+                  : <p className="liveTip">金色光条跟着你的声音走——对齐谱上的音符、变成绿色，就是唱准了</p>)}
                 <div className="staffBox">
                   <Piano highlight={[q.midi]} from={level <= 2 ? 60 : Math.min(60, q.midi)} to={level <= 2 ? 64 : Math.max(71, q.midi)} />
                 </div>
