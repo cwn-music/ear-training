@@ -13,12 +13,24 @@ const PIANO_URLS: Record<string, string> = {
   A6: 'A6.mp3', C7: 'C7.mp3', 'D#7': 'Ds7.mp3', 'F#7': 'Fs7.mp3',
   A7: 'A7.mp3', C8: 'C8.mp3',
 }
-const PIANO_BASE = 'https://tonejs.github.io/audio/salamander/'
+// 采样文件托管在站点自己的域名下（public/audio/），不再依赖 github.io——国内网络直连 GitHub 经常被掐断，
+// 这就是安卓/部分苹果手机做题没声音的根源。采样清单按音色库真实存在的文件整理（原清单里小提琴 B4/D5/F5、
+// 小号 F#4/A4/C5/E5 在源头就是 404，已剔除并补上真实存在的更密采样，音色过渡更自然）。
+const PIANO_BASE = '/audio/salamander/'
 
 const INST_URLS: Record<Exclude<InstId, 'piano'>, { base: string; urls: Record<string, string> }> = {
-  violin: { base: 'https://nbrosowsky.github.io/tonejs-instruments/samples/violin/', urls: { G3: 'G3.mp3', C4: 'C4.mp3', E4: 'E4.mp3', G4: 'G4.mp3', B4: 'B4.mp3', D5: 'D5.mp3', F5: 'F5.mp3', A5: 'A5.mp3' } },
-  flute: { base: 'https://nbrosowsky.github.io/tonejs-instruments/samples/flute/', urls: { C4: 'C4.mp3', E4: 'E4.mp3', A4: 'A4.mp3', C5: 'C5.mp3', E5: 'E5.mp3', A5: 'A5.mp3', C6: 'C6.mp3' } },
-  trumpet: { base: 'https://nbrosowsky.github.io/tonejs-instruments/samples/trumpet/', urls: { A3: 'A3.mp3', C4: 'C4.mp3', 'D#4': 'Ds4.mp3', F4: 'F4.mp3', A4: 'A4.mp3', C5: 'C5.mp3' } },
+  violin: {
+    base: '/audio/violin/',
+    urls: { G3: 'G3.mp3', A3: 'A3.mp3', C4: 'C4.mp3', E4: 'E4.mp3', G4: 'G4.mp3', A4: 'A4.mp3', C5: 'C5.mp3', E5: 'E5.mp3', G5: 'G5.mp3', A5: 'A5.mp3', C6: 'C6.mp3', E6: 'E6.mp3', G6: 'G6.mp3' },
+  },
+  flute: {
+    base: '/audio/flute/',
+    urls: { C4: 'C4.mp3', E4: 'E4.mp3', A4: 'A4.mp3', C5: 'C5.mp3', E5: 'E5.mp3', A5: 'A5.mp3', C6: 'C6.mp3' },
+  },
+  trumpet: {
+    base: '/audio/trumpet/',
+    urls: { A3: 'A3.mp3', C4: 'C4.mp3', 'D#4': 'Ds4.mp3', G4: 'G4.mp3', D5: 'D5.mp3', F5: 'F5.mp3', A5: 'A5.mp3', C6: 'C6.mp3' },
+  },
 }
 
 let piano: Tone.Sampler | null = null
@@ -35,6 +47,23 @@ function safeTrigger(s: Tone.Sampler, note: string, dur: number | string, t?: nu
   } catch {
     // ignore
   }
+}
+
+// 移动端音频解锁：iOS Safari 来电/切后台后 AudioContext 会掉进 interrupted/suspended，
+// 安卓部分 WebView 也要求在手势里恢复。挂一次全局监听，任何触摸/点击/回前台都把上下文拉回 running。
+let unlockInstalled = false
+export function installAudioUnlock(): void {
+  if (unlockInstalled) return
+  unlockInstalled = true
+  const resume = () => {
+    if (Tone.getContext().state !== 'running') void Tone.start().catch(() => undefined)
+  }
+  for (const ev of ['pointerdown', 'touchstart', 'keydown']) {
+    window.addEventListener(ev, resume, { passive: true })
+  }
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) resume()
+  })
 }
 
 export async function ensureAudio(): Promise<void> {
