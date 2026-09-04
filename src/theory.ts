@@ -38,10 +38,21 @@ export type FillQ = { kind: 'fill'; seq: (number | null)[]; answer: number; opti
 // 三音组模唱：听三个音，跟着唱准（麦克风评测）
 export type SingQ = { kind: 'sing'; notes: number[] }
 
+// —— 课程设计新增题型（第二/三/四课）——
+// 模唱另一个音：先后听两个音，告知第一个音，把第二个音唱出来
+export type Sing2Q = { kind: 'sing2'; a: number; b: number }
+// 弹出另一个音：先后听两个音，亮出第一个音的琴键，在琴键上弹出第二个音
+export type Play2Q = { kind: 'play2'; a: number; b: number }
+// 强弱追问：先判断哪个音更响，答对后把更响的那个音在琴键上弹出来
+export type DynoteQ = { kind: 'dynote'; a: number; b: number; va: number; vb: number; answer: 'louder' | 'softer'; target: number }
+// 跟着音乐弹奏：彩色长条滚到节拍线时按下对应琴键，不按键则暂停等待
+export type PlayalongQ = { kind: 'playalong'; pat: number }
+
 export type Question =
   | PitchQ | StepleapQ | IntervalQ | MelodyQ | RhythmQ | ScaleQ | TimbreQ | SightQ
   | PitchCmpQ | DurCmpQ | DynCmpQ | DirectQ | MeterQ
   | PlaceQ | JudgeQ | FillQ | SingQ
+  | Sing2Q | Play2Q | DynoteQ | PlayalongQ
 
 export type Kind = Question['kind']
 
@@ -309,6 +320,49 @@ function genSing(): SingQ {
   return { kind: 'sing', notes: [60, 62, 64] }
 }
 
+// —— 课程设计新增题型生成器 ——
+// 第二课只学 do re mi 三个白键，两音必须不同
+const DRE = [60, 62, 64] as const
+function twoDifferentDre(): [number, number] {
+  const a = pick(DRE)
+  let b = pick(DRE)
+  while (b === a) b = pick(DRE)
+  return [a, b]
+}
+
+function genSing2(): Sing2Q {
+  const [a, b] = twoDifferentDre()
+  return { kind: 'sing2', a, b }
+}
+
+function genPlay2(): Play2Q {
+  const [a, b] = twoDifferentDre()
+  return { kind: 'play2', a, b }
+}
+
+function genDynote(): DynoteQ {
+  const [a, b] = twoDifferentDre()
+  const soft = 0.35, loud = 1
+  // 第二个音更响 → 追问目标就是 b；反之是 a
+  if (Math.random() < 0.5) return { kind: 'dynote', a, b, va: soft, vb: loud, answer: 'louder', target: b }
+  return { kind: 'dynote', a, b, va: loud, vb: soft, answer: 'softer', target: a }
+}
+
+// 跟着音乐弹奏的曲目库（只用 do re mi；数值 = 拍数，呼应第三课「长短」主题）
+export const PA_PATTERNS: { m: number; beats: number }[][] = [
+  // 级进上下：do re mi | mi re do（长）
+  [{ m: 60, beats: 1 }, { m: 62, beats: 1 }, { m: 64, beats: 1 }, { m: 64, beats: 1 }, { m: 62, beats: 1 }, { m: 62, beats: 1 }, { m: 60, beats: 2 }],
+  // 双音重复 + 长音收尾：do do | re re | mi（长） re | do（长）
+  [{ m: 60, beats: 1 }, { m: 60, beats: 1 }, { m: 62, beats: 1 }, { m: 62, beats: 1 }, { m: 64, beats: 2 }, { m: 62, beats: 1 }, { m: 60, beats: 2 }],
+  // 带八分音符：do re | mi re | mi mi | do（长）
+  [{ m: 60, beats: 0.5 }, { m: 62, beats: 0.5 }, { m: 64, beats: 1 }, { m: 62, beats: 1 }, { m: 64, beats: 1 }, { m: 64, beats: 1 }, { m: 60, beats: 2 }],
+  // 跳进 + 八分：do mi | re mi | do do（短） re（长）
+  [{ m: 60, beats: 1 }, { m: 64, beats: 1 }, { m: 62, beats: 1 }, { m: 64, beats: 1 }, { m: 60, beats: 0.5 }, { m: 60, beats: 0.5 }, { m: 62, beats: 2 }],
+]
+function genPlayalong(): PlayalongQ {
+  return { kind: 'playalong', pat: rand(0, PA_PATTERNS.length - 1) }
+}
+
 // —— 第一批新题型生成器 ——
 function genPitchCmp(level: number): PitchCmpQ {
   // 初级（1~2 课）只用五度/八度大跨度，且不出「一样高」
@@ -403,9 +457,9 @@ function genMeter(): MeterQ {
 // —— 各级题型池 ——
 export const LEVEL_KINDS: Record<number, Kind[]> = {
   1: ['pitch'],
-  2: ['pitchcmp', 'pitch'],
-  3: ['durcmp'],
-  4: ['dyncmp'],
+  2: ['pitchcmp', 'pitch', 'sing2', 'play2'],
+  3: ['durcmp', 'playalong'],
+  4: ['dyncmp', 'dynote'],
   5: ['sight', 'pitch', 'place', 'judge'],
   6: ['interval', 'pitch'],
   7: ['interval', 'pitch'],
@@ -424,7 +478,7 @@ export const LEVEL_KINDS: Record<number, Kind[]> = {
   20: ['pitch', 'interval'],
   21: ['sight', 'melody', 'sing'],
   22: ['sight', 'pitch'],
-  23: ['pitchcmp', 'durcmp', 'dyncmp', 'direct', 'meter', 'interval', 'melody', 'rhythm', 'scale', 'timbre', 'sight', 'stepleap', 'pitch', 'place', 'judge', 'fill'],
+  23: ['pitchcmp', 'durcmp', 'dyncmp', 'direct', 'meter', 'interval', 'melody', 'rhythm', 'scale', 'timbre', 'sight', 'stepleap', 'pitch', 'place', 'judge', 'fill', 'sing2', 'play2', 'dynote', 'playalong'],
 }
 
 // 按指定题型生成一题（错题重练用：只抽错题题型，生成同知识点变式题）
@@ -447,6 +501,10 @@ export function makeQuestionOfKind(kind: Kind, level: number): Question {
     case 'judge': return genJudge(level)
     case 'fill': return genFill()
     case 'sing': return genSing()
+    case 'sing2': return genSing2()
+    case 'play2': return genPlay2()
+    case 'dynote': return genDynote()
+    case 'playalong': return genPlayalong()
   }
 }
 

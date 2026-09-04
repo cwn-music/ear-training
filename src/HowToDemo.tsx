@@ -9,13 +9,14 @@ export type DemoKind =
   | 'pitchcmp' | 'durcmp' | 'dyncmp'
   | 'interval' | 'stepleap' | 'direct' | 'fill'
   | 'melody' | 'rhythm' | 'meter' | 'timbre' | 'scale' | 'sing'
+  | 'sing2' | 'play2' | 'dynote' | 'playalong'
 
 // 每种新题型第一次出现的课
 export const LESSON_DEMOS: Record<number, DemoKind[]> = {
   1: ['pitch'],
-  2: ['pitchcmp'],
-  3: ['durcmp'],
-  4: ['dyncmp'],
+  2: ['pitchcmp', 'sing2', 'play2'],
+  3: ['durcmp', 'playalong'],
+  4: ['dyncmp', 'dynote'],
   5: ['sight', 'place', 'judge'],
   6: ['interval'],
   8: ['stepleap'],
@@ -33,6 +34,7 @@ export const DEMO_LABELS: Record<DemoKind, string> = {
   interval: '音程', stepleap: '级进跳进', direct: '旋律走向', fill: '补缺口',
   melody: '选旋律', rhythm: '选节奏', meter: '数拍子', timbre: '辨音色',
   scale: '大小调', sing: '开口唱',
+  sing2: '唱另一个音', play2: '弹另一个音', dynote: '强弱找音', playalong: '跟着弹',
 }
 
 type P = CSSProperties
@@ -329,6 +331,61 @@ function DemoStage({ kind }: { kind: DemoKind }) {
             </span>
           ))}
           <span className="dmSingHint">听示范 → 跟着唱 → 唱准一个亮一个</span>
+        </>
+      )
+    // 唱另一个音：听先后两个音，告知第一个，唱出第二个
+    case 'sing2':
+      return (
+        <>
+          <span className="dmDot" style={{ left: '28%', top: 52 }} />
+          <span className="dmDot" style={{ left: '56%', top: 26 }} />
+          <Mark x="28%" y={76}>①do</Mark>
+          <Mark x="56%" y={50}>②?</Mark>
+          <span className="dmSound" style={{ right: 14, top: 10 }}><Waves /></span>
+          <span className="dmMic" />
+          <span className="dmChip dmSingChip dmHit" style={{ left: '40%', bottom: 38 }}>
+            唱第二个音<i className="dmCheck dmSingCheck">✓</i>
+          </span>
+        </>
+      )
+    // 弹另一个音：第一个音的琴键已亮出，弹出第二个
+    case 'play2':
+      return (
+        <>
+          <span className="dmSound" style={{ right: 14, top: 10 }}><Waves /></span>
+          <Mark x="30%" y={18}>①已亮出</Mark>
+          <MiniPiano glowKey={0} flashKey={1} top={46} keys={3} />
+          <Finger fx="50%" fy="72px" />
+          <span className="dmSingHint">听两个音 → 第一个已亮出 → 弹出第二个</span>
+        </>
+      )
+    // 强弱找音：先比强弱，再把更响的音弹出来
+    case 'dynote':
+      return (
+        <>
+          <span className="dmDot" style={{ left: '28%', top: 40, width: 14, height: 14 }} />
+          <span className="dmDot" style={{ left: '54%', top: 30, width: 28, height: 28 }} />
+          <Mark x="28%" y={64}>①</Mark>
+          <Mark x="54%" y={64}>②</Mark>
+          <span className="dmSound" style={{ right: 14, top: 10 }}><Waves /></span>
+          <MiniPiano flashKey={1} top={88} keys={3} />
+          <Finger fx="50%" fy="114px" />
+          <span className="dmSingHint">先比强弱 → 再把更响的音弹出来</span>
+        </>
+      )
+    // 跟着弹：长条滚到金色线，按那一行的琴键
+    case 'playalong':
+      return (
+        <>
+          <div className="dmRail">
+            {[0, 1, 2].map(i => (
+              <span key={i} className="dmRailBar" style={{ '--n': i } as P} />
+            ))}
+            <i className="dmRailBeat" />
+          </div>
+          <MiniPiano flashKey={1} top={92} keys={3} />
+          <Finger fx="50%" fy="118px" />
+          <span className="dmSingHint">长条碰到金线 → 按那一行的琴键</span>
         </>
       )
   }

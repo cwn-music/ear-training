@@ -17,6 +17,8 @@ import {
 import Staff, { noteYOnStaff } from './Staff'
 import Sing from './Sing'
 import SingGroup from './SingGroup'
+import SingPair from './SingPair'
+import PlayAlong from './PlayAlong'
 import Piano from './Piano'
 import Learn from './Learn'
 
@@ -90,6 +92,10 @@ const sigOf = (q: Question): string => {
     case 'judge': return `jd:${q.midi}:${q.shown === q.midi}`
     case 'fill': return `fi:${q.seq.map(n => n ?? 'x').join(',')}`
     case 'sing': return `sg:${q.notes.join(',')}`
+    case 'sing2': return `s2:${q.a},${q.b}`
+    case 'play2': return `p2:${q.a},${q.b}`
+    case 'dynote': return `dn:${q.target}`
+    case 'playalong': return `pa:${q.pat}`
   }
 }
 
@@ -131,6 +137,12 @@ export default function App() {
   const [singResult, setSingResult] = useState<{ ok: boolean; heard: number | null } | null>(null)
   // 跟唱中实时听到的音（谱面光条用，null=收起来）
   const [liveHeard, setLiveHeard] = useState<number | null>(null)
+  // 强弱追问题的阶段：cmp=先比强弱，note=再把更响的音弹出来
+  const [dynStage, setDynStage] = useState<'cmp' | 'note'>('cmp')
+  // 模唱另一个音（sing2）唱错时：记下听到的音做诊断
+  const [micHeard, setMicHeard] = useState<number | null>(null)
+  // 跟着音乐弹奏（playalong）的战报：准时/补上/错键
+  const [paStat, setPaStat] = useState<{ hit: number; filled: number; wrong: number } | null>(null)
   const [placementStage, setPlacementStage] = useState(0)
   const [placementHit, setPlacementHit] = useState(0)
   const [zooming, setZooming] = useState(false)
@@ -171,6 +183,9 @@ export default function App() {
     setSingHold(false)
     setSingResult(null)
     setLiveHeard(null)
+    setDynStage('cmp')
+    setMicHeard(null)
+    setPaStat(null)
     setSessionLog([])
     setReviewMode(false)
     setPlacementStage(0)
@@ -199,6 +214,9 @@ export default function App() {
     setSingHold(false)
     setSingResult(null)
     setLiveHeard(null)
+    setDynStage('cmp')
+    setMicHeard(null)
+    setPaStat(null)
     setSessionLog([])
     setReviewMode(true)
     setPlacementStage(0)
@@ -225,6 +243,9 @@ export default function App() {
     setSingHold(false)
     setSingResult(null)
     setLiveHeard(null)
+    setDynStage('cmp')
+    setMicHeard(null)
+    setPaStat(null)
     setSessionLog([])
     setReviewMode(false)
     setPhase('playing')
@@ -249,6 +270,10 @@ export default function App() {
       case 'judge': return question.shown === question.midi ? '标对了' : '标错了'
       case 'fill': return displayName(question.answer)
       case 'sing': return question.notes.map(solfegeOf).join(' ')
+      case 'sing2': return displayName(question.b)
+      case 'play2': return displayName(question.b)
+      case 'dynote': return displayName(question.target)
+      case 'playalong': return '跟上节拍弹完'
     }
   }
 
@@ -310,6 +335,20 @@ export default function App() {
       }
       case 'sing':
         return '没关系，先点「再听一遍示范」，把三个音哼熟了再唱'
+      case 'sing2':
+        return micHeard === null
+          ? '这次没听清你的声音——靠近麦克风，把第二个音唱长一点'
+          : `你唱的是 ${displayName(micHeard)}，第二个音其实是 ${displayName(question.b)}`
+      case 'play2':
+        return `你弹的是 ${displayName(Number(pickedId))}，第二个音其实是 ${displayName(question.b)}`
+      case 'dynote':
+        return pickedId.startsWith('key:')
+          ? `你弹的是 ${displayName(Number(pickedId.slice(4)))}，更响的那个音是 ${displayName(question.target)}`
+          : `第二个音其实${question.answer === 'louder' ? '更响' : '更轻'}——先听准强弱，再找音`
+      case 'playalong':
+        return paStat
+          ? `准时 ${paStat.hit} 个、补上 ${paStat.filled} 个、错键 ${paStat.wrong} 次——错键不超过 1 次才算过关`
+          : '这次没跟上——长条碰到金色线时，按它那一行的琴键'
     }
   }
 
@@ -364,9 +403,14 @@ export default function App() {
         return [{ id: '2', label: '二拍子' }, { id: '3', label: '三拍子' }]
       case 'judge':
         return [{ id: 'yes', label: '标对了 ✓' }, { id: 'no', label: '标错了 ✗' }]
+      case 'dynote': // 第一阶段：比强弱；第二阶段点琴键
+        return [{ id: 'louder', label: '更响' }, { id: 'softer', label: '更轻' }]
       case 'place': // 摆音符：点谱面上的发光圈作答，不出选项按钮
       case 'fill': // 补全音组：点琴键作答，不出选项按钮
       case 'sing': // 模唱：麦克风评测，不出选项按钮
+      case 'sing2': // 模唱另一个音：麦克风评测
+      case 'play2': // 弹出另一个音：点琴键作答
+      case 'playalong': // 跟着音乐弹奏：琴键实时作答
         return []
     }
   }
@@ -403,6 +447,10 @@ export default function App() {
       case 'judge': return (id === 'yes') === (question.shown === question.midi)
       case 'fill': return Number(id) === question.answer
       case 'sing': return id === 'sing-ok'
+      case 'sing2': return id === 'sing-ok'
+      case 'play2': return Number(id) === question.b
+      case 'dynote': return id.startsWith('key:') ? Number(id.slice(4)) === question.target : id === question.answer
+      case 'playalong': return id === 'pa-ok'
     }
   }
 
@@ -427,6 +475,10 @@ export default function App() {
       case 'judge': playNote(question.shown); break
       case 'fill': playFill(question.seq); break
       case 'sing': playMelody(question.notes, 0.5, 0.7); break
+      case 'sing2': playTwo(question.a, question.b, { gap: 0.55 }); break
+      case 'play2': playTwo(question.a, question.b, { gap: 0.55 }); break
+      case 'dynote': playTwo(question.a, question.b, { va: question.va, vb: question.vb, gap: 0.55 }); break
+      case 'playalong': break // 弹奏题由孩子点「开始」启动，不自动播放
     }
   }
 
@@ -449,6 +501,10 @@ export default function App() {
       case 'judge': return '谱面上这个音的名字，标对了吗？'
       case 'fill': return '这段音组缺了一个音——听一听，点琴键把它补上'
       case 'sing': return '听示范，跟着唱出这三个音（唱准一个亮一个）'
+      case 'sing2': return `听先后两个音：第一个是 ${displayName(question.a)}——把第二个音唱出来`
+      case 'play2': return '听先后两个音：第一个音的琴键亮着①——把第二个音弹出来'
+      case 'dynote': return '听先后两个音：第二个音比第一个音——' // 第二阶段文案在渲染处按 dynStage 覆盖
+      case 'playalong': return '跟着音乐弹：长条碰到金色节拍线时，按下它那一行的琴键'
     }
   }
 
@@ -464,10 +520,16 @@ export default function App() {
 
   // 答错反馈的三层：结果（对错）→ 图形定位（正确项标绿）→ 文字诊断（错在哪）
   // 长内容的题（旋律/节奏等）不再自动重播，靠延长停留 + 谱面对照
-  const LONG_KINDS: Kind[] = ['melody', 'rhythm', 'scale', 'timbre', 'meter', 'direct']
+  const LONG_KINDS: Kind[] = ['melody', 'rhythm', 'scale', 'timbre', 'meter', 'direct', 'playalong']
 
   const answer = (id: string) => {
     if (picked !== null || !q) return
+    // 强弱追问题：第一阶段（比强弱）答对 → 进入第二阶段（把更响的音弹出来），不计分不判错
+    if (q.kind === 'dynote' && dynStage === 'cmp' && id === q.answer) {
+      setDynStage('note')
+      window.setTimeout(() => playTwo(q.a, q.b, { va: q.va, vb: q.vb, gap: 0.55 }), 500) // 再听一遍，找那个更响的
+      return
+    }
     setPicked(id)
     const ok = isCorrect(q, id)
     const nextScore = ok ? score + 1 : score
@@ -483,6 +545,11 @@ export default function App() {
     // 模唱题：麦克风评测刚结束，反馈停住不自动跳题，由学习者自己点「下一题」
     if (q.kind === 'sing') {
       if (!ok) window.setTimeout(() => playQuestion(q), 600) // 唱错：自动重播一遍示范
+      return
+    }
+
+    // 课程设计新题型：答对也停住——要留时间看答案揭示（唱名 + 五线谱全音符），手动点「下一题」
+    if (ok && !isPlacement && (q.kind === 'sing2' || q.kind === 'play2' || q.kind === 'dynote' || q.kind === 'playalong')) {
       return
     }
 
@@ -518,6 +585,9 @@ export default function App() {
     setSingHold(false)
     setSingResult(null)
     setLiveHeard(null)
+    setDynStage('cmp')
+    setMicHeard(null)
+    setPaStat(null)
     setPicked(null)
     const isPlacement = questions.length === 3
     if (isPlacement) {
@@ -723,8 +793,12 @@ export default function App() {
 
       {!singing ? (
         <>
-          <h3 className="prompt">{promptOf(q)}</h3>
-          {q.kind !== 'sing' && (
+          <h3 className="prompt">
+            {q.kind === 'dynote'
+              ? (dynStage === 'cmp' ? promptOf(q) : '答对了！那更响的那个音，是 do re mi 里的哪一个？把它弹出来')
+              : promptOf(q)}
+          </h3>
+          {q.kind !== 'sing' && q.kind !== 'playalong' && (
             <button className="btn ghost" onClick={() => playQuestion(q)}>▶ 再听一遍</button>
           )}
 
@@ -807,6 +881,62 @@ export default function App() {
             <button className="btn ghost small" onClick={() => answer('sing-no')}>跳过这一题</button>
           )}
 
+          {/* 弹出另一个音：① 亮出第一个音，孩子按第二个音 */}
+          {q.kind === 'play2' && (
+            <div className="staffBox">
+              <Piano
+                interactive={picked === null}
+                from={60}
+                to={64}
+                highlight={picked === null ? [q.a] : [q.b]}
+                marks={picked === null ? { [q.a]: '①' } : { [q.b]: '②', ...(Number(picked) !== q.b ? { [Number(picked)]: '你' } : {}) }}
+                onPick={m => answer(String(m))}
+              />
+            </div>
+          )}
+
+          {/* 强弱追问：第二阶段弹出更响的音；答完亮出正确键 */}
+          {q.kind === 'dynote' && dynStage === 'note' && picked === null && (
+            <div className="staffBox">
+              <Piano interactive from={60} to={64} onPick={m => answer(`key:${m}`)} />
+            </div>
+          )}
+          {q.kind === 'dynote' && picked !== null && picked.startsWith('key:') && (
+            <div className="staffBox">
+              <Piano
+                from={60}
+                to={64}
+                highlight={[q.target]}
+                marks={{ [q.target]: '✓', ...(Number(picked.slice(4)) !== q.target ? { [Number(picked.slice(4))]: '你' } : {}) }}
+              />
+            </div>
+          )}
+
+          {/* 模唱另一个音 */}
+          {q.kind === 'sing2' && picked === null && (
+            <>
+              <SingPair
+                a={q.a}
+                b={q.b}
+                ghostMic={new URLSearchParams(location.search).has('ghostMic')}
+                onDone={(ok, heard) => { setMicHeard(heard); answer(ok ? 'sing-ok' : 'sing-no') }}
+              />
+              <button className="btn ghost small" onClick={() => { setMicHeard(null); answer('sing-no') }}>跳过这一题</button>
+            </>
+          )}
+
+          {/* 跟着音乐弹奏 */}
+          {q.kind === 'playalong' && picked === null && (
+            <>
+              <PlayAlong
+                pat={q.pat}
+                onDone={(ok, stats) => { setPaStat(stats); answer(ok ? 'pa-ok' : 'pa-no') }}
+              />
+              <button className="btn ghost small" onClick={() => { setPaStat(null); answer('pa-no') }}>跳过这一题</button>
+            </>
+          )}
+
+          {!(q.kind === 'dynote' && dynStage === 'note') && (
           <div className={'options' + (q.kind === 'melody' || q.kind === 'rhythm' ? ' wide' : '')}>
             {optionOf(q).map(o => {
               const cls = picked === null
@@ -823,18 +953,37 @@ export default function App() {
               )
             })}
           </div>
+          )}
 
           {picked !== null && (
             <div className={'feedback ' + (isCorrect(q, picked) ? 'ok' : 'no')}>
               {isCorrect(q, picked) ? (
-                q.kind === 'sing' ? '答对了！三个音都唱准了' : '答对了'
+                q.kind === 'sing' ? '答对了！三个音都唱准了'
+                  : q.kind === 'sing2' ? `唱对了！第二个音就是 ${displayName(q.b)}`
+                    : q.kind === 'play2' ? `答对了！第二个音就是 ${displayName(q.b)}`
+                      : q.kind === 'dynote' ? '答对了！耳朵听出了强弱，手指也找到了它'
+                        : q.kind === 'playalong'
+                          ? (paStat
+                            ? `弹完了！准时 ${paStat.hit} 个` + (paStat.filled > 0 ? `、补上 ${paStat.filled} 个` : '') + '，跟上节奏了'
+                            : '弹完了！跟上节奏了')
+                          : '答对了'
               ) : (
                 <>
                   <div className="fbDiag">{diagnosisOf(q, picked)}</div>
                   <div className="fbAnswer">
                     {q.kind === 'sing'
                       ? '示范已自动重播一遍，跟熟了再点下方按钮继续'
-                      : q.kind === 'place'
+                      : q.kind === 'sing2'
+                        ? `正确答案：第二个音是 ${displayName(q.b)}（谱面上已揭晓，可点下方按钮再听）`
+                        : q.kind === 'play2'
+                          ? `正确答案：第二个音是 ${displayName(q.b)}（谱面已揭晓，琴键上标了②）`
+                          : q.kind === 'dynote'
+                            ? (picked.startsWith('key:')
+                              ? `更响的那个音是 ${displayName(q.target)}（琴键上已亮出 ✓）`
+                              : `正确答案：第二个音${q.answer === 'louder' ? '更响' : '更轻'}——更响的是 ${displayName(q.target)}`)
+                            : q.kind === 'playalong'
+                              ? '跟着滚动长条再练一次：到线就按键，没跟上音乐会等你'
+                              : q.kind === 'place'
                         ? `正确答案：${answerLabelOf(q)}（谱面上标绿的位置）`
                         : q.kind === 'fill'
                           ? `正确答案：${answerLabelOf(q)}（琴键上已亮出，声音会再播一遍）`
@@ -860,6 +1009,30 @@ export default function App() {
                           </button>
                         </>
                       )}
+                      {(q.kind === 'sing2' || q.kind === 'play2') && (
+                        <>
+                          <button
+                            className="btn ghost small"
+                            onClick={() => { void ensureAudio().then(() => playTwo(q.a, q.b, { gap: 0.55 })) }}
+                          >
+                            ▶ 再听两个音
+                          </button>
+                          <button
+                            className="btn ghost small"
+                            onClick={() => { void ensureAudio().then(() => playNote(q.b, 1, 0.9)) }}
+                          >
+                            ▶ 正确的 {displayName(q.b)}
+                          </button>
+                        </>
+                      )}
+                      {q.kind === 'dynote' && (
+                        <button
+                          className="btn ghost small"
+                          onClick={() => { void ensureAudio().then(() => playTwo(q.a, q.b, { va: q.va, vb: q.vb, gap: 0.55 })) }}
+                        >
+                          ▶ 再听一遍
+                        </button>
+                      )}
                       <button className="btn primary" onClick={() => advance(false, score)}>
                         {qi + 1 < questions.length ? '下一题 ›' : '查看成绩 ›'}
                       </button>
@@ -869,6 +1042,25 @@ export default function App() {
               )}
               {q.kind === 'pitchcmp' && level <= 4 && (
                 <Piano highlight={[q.a, q.b]} marks={{ [q.a]: '①', [q.b]: '②' }} from={Math.min(q.a, q.b) - 3} to={Math.max(q.a, q.b) + 3} label={false} />
+              )}
+              {/* 课程设计新题型的答案揭示：两个音都以全音符写上五线谱，并给出唱名 */}
+              {(q.kind === 'sing2' || q.kind === 'play2' || q.kind === 'dynote') && (
+                <div className="staffBox revealBox">
+                  <Staff clef="treble" midis={[q.a, q.b]} width={230} />
+                  <p className="revealCap">
+                    {q.kind === 'dynote'
+                      ? <>更响的是 <b>{displayName(q.target)}</b>（{q.target === q.b ? '第二个音' : '第一个音'}）· 谱面从左到右：{solfegeOf(q.a)} → {solfegeOf(q.b)}</>
+                      : <>谱面从左到右：第一个音 <b>{displayName(q.a)}</b>，第二个音 <b>{displayName(q.b)}</b></>}
+                  </p>
+                </div>
+              )}
+              {/* 新题型答对后也不自动跳题，孩子看完揭示再自己点 */}
+              {(q.kind === 'sing2' || q.kind === 'play2' || q.kind === 'dynote' || q.kind === 'playalong') && isCorrect(q, picked) && !isPlacementNow && (
+                <div className="singNextRow">
+                  <button className="btn primary" onClick={() => advance(true, score)}>
+                    {qi + 1 < questions.length ? '下一题 ›' : '查看成绩 ›'}
+                  </button>
+                </div>
               )}
               {q.kind === 'sing' && (
                 <div className="singNextRow">
@@ -1015,7 +1207,12 @@ export default function App() {
               <div className="reviewText">
                 <span className="reviewPrompt">{promptOf(l.q)}</span>
                 <span className="reviewAns">
-                  你选：{optionOf(l.q).find(o => o.id === l.picked)?.label}　·　正确：{answerLabelOf(l.q)}
+                  你选：{optionOf(l.q).find(o => o.id === l.picked)?.label
+                    ?? (l.q.kind === 'play2' ? displayName(Number(l.picked))
+                      : l.q.kind === 'dynote' && l.picked.startsWith('key:') ? displayName(Number(l.picked.slice(4)))
+                        : l.picked === 'sing-no' ? '没唱准'
+                          : l.picked === 'pa-no' ? '没跟上'
+                            : '')}　·　正确：{answerLabelOf(l.q)}
                 </span>
               </div>
               <button className="btn ghost small" onClick={() => playQuestion(l.q)}>▶ 重听</button>

@@ -6,6 +6,7 @@ import { displayName } from './theory'
 interface Props {
   target: number
   ghostMic?: boolean // 冒烟测试：不申请麦克风，直接成功
+  prompt?: string // 覆盖「请唱：X」文案（模唱另一个音时不能剧透目标唱名）
   onDone: (ok: boolean, heard?: number | null) => void
   onHear?: (midi: number | null) => void // 实时汇报听到的音（谱面光条用）
 }
@@ -17,7 +18,7 @@ const TIMEOUT_MS = 12000
 
 const midiOfFreq = (f: number) => 69 + 12 * Math.log2(f / 440)
 
-export default function Sing({ target, ghostMic = false, onDone, onHear }: Props) {
+export default function Sing({ target, ghostMic = false, prompt, onDone, onHear }: Props) {
   const [heard, setHeard] = useState<number | null>(null)
   const [state, setState] = useState<'init' | 'listening' | 'done'>('init')
   const doneRef = useRef(false)
@@ -130,7 +131,7 @@ export default function Sing({ target, ghostMic = false, onDone, onHear }: Props
 
   return (
     <div className="singPanel">
-      <div className="singTarget">请唱：{displayName(target)}</div>
+      <div className="singTarget">{prompt ?? `请唱：${displayName(target)}`}</div>
       <div className={'singDot ' + state}>{state === 'listening' ? '正在听…' : state === 'done' ? '完成' : '准备中…'}</div>
       {heard !== null && <div className="singHeard">听到：{displayName(heard)}</div>}
     </div>

@@ -1090,3 +1090,77 @@ h1, h2, h3 { font-weight: 600; color: var(--slate); }
 @media (prefers-reduced-motion: reduce) {
   .dmStage, .dmStage * { animation: none !important; }
 }
+
+/* —— 模唱另一个音（sing2）—— */
+.singPair { display: flex; flex-direction: column; gap: 8px; align-items: center; }
+.hintLine { text-align: center; font-size: 0.9375rem; color: var(--ink); margin: 2px 0; }
+.hintLine b { color: var(--gold); }
+.singPairBtns { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: center; }
+
+/* —— 答案揭示（sing2 / play2 / dynote）：五线谱全音符 + 唱名说明 —— */
+.revealBox { margin-top: 10px; flex-direction: column; align-items: center; gap: 4px; }
+.revealCap { text-align: center; font-size: 0.875rem; color: var(--ink); margin: 4px 0 0; }
+.revealCap b { color: var(--gold); }
+
+/* —— 跟着音乐弹奏（playalong）—— */
+.playAlong { display: flex; flex-direction: column; gap: 8px; align-items: center; }
+.paStage {
+  border: 1.5px solid var(--slate);
+  border-radius: 12px 14px 12px 15px / 14px 12px 15px 12px;
+  background: var(--paper);
+  padding: 4px;
+  transition: box-shadow 0.15s ease;
+}
+.paStage.paFlash { box-shadow: 0 0 0 3px rgba(192, 91, 77, 0.45); }
+.paSvg { display: block; width: 100%; max-width: 340px; height: auto; }
+.paLine { stroke: rgba(34, 48, 74, 0.75); stroke-width: 1; }
+.paLane { font-size: 9.5px; fill: var(--slate); font-style: italic; }
+.paLaneDot { fill: var(--paper2); stroke: var(--slate); stroke-width: 1.2; }
+.paBeat { stroke: var(--gold); stroke-width: 2.5; stroke-linecap: round; }
+.paBeatGem { fill: var(--gold); }
+.paBar {
+  fill: rgba(185, 150, 47, 0.18);
+  stroke: var(--slate);
+  stroke-width: 1.6;
+}
+.paBar.due { fill: rgba(185, 150, 47, 0.42); stroke: var(--gold); stroke-width: 2; }
+.paBar.hit { fill: rgba(107, 191, 89, 0.4); stroke: #3a7d44; }
+.paBar.filled { fill: rgba(185, 150, 47, 0.5); stroke: var(--gold); }
+.paBar.waiting { animation: paWait 0.9s ease-in-out infinite; }
+@keyframes paWait {
+  0%, 100% { stroke: var(--gold); stroke-width: 2; }
+  50% { stroke: var(--gold); stroke-width: 3.4; }
+}
+.paHint { text-align: center; font-size: 0.9rem; color: var(--ink); margin: 2px 0; min-height: 1.4em; }
+.paHint b { color: var(--gold); }
+.paStats { display: flex; gap: 8px; justify-content: center; }
+.paChip {
+  font-size: 0.75rem;
+  padding: 2px 10px;
+  border-radius: 999px;
+  border: 1.2px solid var(--kraft);
+  background: #fff;
+  color: var(--slate);
+}
+.paChip.ok { border-color: var(--green); color: #2c662d; }
+.paChip.fill { border-color: var(--gold); color: var(--gold); }
+.paChip.miss { border-color: #c05b4d; color: #c05b4d; }
+
+/* —— 「怎么答题」小动画：跟着弹（playalong）的滚动长条 —— */
+.dmRail { position: absolute; left: 0; right: 0; top: 22px; height: 62px; }
+.dmRailBeat { position: absolute; left: 26%; top: 0; bottom: 0; width: 3px; border-radius: 2px; background: var(--gold); }
+.dmRailBar {
+  position: absolute;
+  top: calc(5px + var(--n) * 19px);
+  left: 0;
+  width: 34px; height: 12px;
+  border-radius: 7px;
+  background: rgba(185, 150, 47, 0.3);
+  border: 1.5px solid var(--slate);
+  animation: dmRailGo 3s linear infinite;
+  animation-delay: calc(var(--n) * 1s);
+}
+@keyframes dmRailGo {
+  from { transform: translateX(310px); }
+  to { transform: translateX(-46px); }
+}
