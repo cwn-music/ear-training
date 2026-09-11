@@ -333,44 +333,47 @@ function DemoStage({ kind }: { kind: DemoKind }) {
           <span className="dmSingHint">听示范 → 跟着唱 → 唱准一个亮一个</span>
         </>
       )
-    // 唱另一个音：听先后两个音，告知第一个，唱出第二个
+    // 唱另一个音：左边先后听 ①② 两个音（①会告诉你是 do），右边对着麦克风唱出 ②
     case 'sing2':
       return (
         <>
-          <span className="dmDot" style={{ left: '28%', top: 52 }} />
-          <span className="dmDot" style={{ left: '56%', top: 26 }} />
-          <Mark x="28%" y={76}>①do</Mark>
-          <Mark x="56%" y={50}>②?</Mark>
-          <span className="dmSound" style={{ right: 14, top: 10 }}><Waves /></span>
-          <span className="dmMic" />
-          <span className="dmChip dmSingChip dmHit" style={{ left: '40%', bottom: 38 }}>
-            唱第二个音<i className="dmCheck dmSingCheck">✓</i>
+          <span className="dmDot" style={{ left: '20%', top: 40 }} />
+          <span className="dmDot" style={{ left: '42%', top: 20 }} />
+          <Mark x="20%" y={62}>① do</Mark>
+          <Mark x="42%" y={42}>② ?</Mark>
+          <span className="dmSound" style={{ left: '55%', top: 12 }}><Waves /></span>
+          <span className="dmMicBox">
+            <span className="dmMic" />
+            <i className="dmCheck" />
+            <span className="dmMicLabel">唱第二个音</span>
           </span>
+          <span className="dmFlowHint">听两个音 → 第一个会告诉你 → 唱出第二个</span>
         </>
       )
-    // 弹另一个音：第一个音的琴键已亮出，弹出第二个
+    // 弹另一个音：① 的琴键已亮出，手指弹出 ②
     case 'play2':
       return (
         <>
           <span className="dmSound" style={{ right: 14, top: 10 }}><Waves /></span>
-          <Mark x="30%" y={18}>①已亮出</Mark>
-          <MiniPiano glowKey={0} flashKey={1} top={46} keys={3} />
-          <Finger fx="50%" fy="72px" />
-          <span className="dmSingHint">听两个音 → 第一个已亮出 → 弹出第二个</span>
+          <Mark x="calc(50% - 27px)" y={44}>①</Mark>
+          <Mark x="50%" y={44}>②</Mark>
+          <MiniPiano glowKey={0} flashKey={1} top={66} keys={3} />
+          <Finger fx="50%" fy="94px" />
+          <span className="dmFlowHint">第一个音已亮出 → 弹出第二个音</span>
         </>
       )
     // 强弱找音：先比强弱，再把更响的音弹出来
     case 'dynote':
       return (
         <>
-          <span className="dmDot" style={{ left: '28%', top: 40, width: 14, height: 14 }} />
-          <span className="dmDot" style={{ left: '54%', top: 30, width: 28, height: 28 }} />
-          <Mark x="28%" y={64}>①</Mark>
-          <Mark x="54%" y={64}>②</Mark>
+          <span className="dmDot" style={{ left: '24%', top: 24, width: 14, height: 14 }} />
+          <span className="dmDot" style={{ left: '50%', top: 18, width: 28, height: 28 }} />
+          <Mark x="24%" y={48}>①</Mark>
+          <Mark x="50%" y={48}>②</Mark>
           <span className="dmSound" style={{ right: 14, top: 10 }}><Waves /></span>
-          <MiniPiano flashKey={1} top={88} keys={3} />
-          <Finger fx="50%" fy="114px" />
-          <span className="dmSingHint">先比强弱 → 再把更响的音弹出来</span>
+          <MiniPiano flashKey={1} top={72} keys={3} />
+          <Finger fx="50%" fy="100px" />
+          <span className="dmFlowHint">先比强弱 → 把更响的音弹出来</span>
         </>
       )
     // 跟着弹：长条滚到金色线，按那一行的琴键
@@ -383,9 +386,9 @@ function DemoStage({ kind }: { kind: DemoKind }) {
             ))}
             <i className="dmRailBeat" />
           </div>
-          <MiniPiano flashKey={1} top={92} keys={3} />
-          <Finger fx="50%" fy="118px" />
-          <span className="dmSingHint">长条碰到金线 → 按那一行的琴键</span>
+          <MiniPiano flashKey={1} top={76} keys={3} />
+          <Finger fx="50%" fy="104px" />
+          <span className="dmFlowHint">长条碰到金线 → 按那一行的琴键</span>
         </>
       )
   }
