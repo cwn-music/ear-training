@@ -381,7 +381,7 @@ h1, h2, h3 { font-weight: 600; color: var(--slate); }
 .feedback.no { background: #fbecec; color: #8a2724; }
 .feedback .piano { margin-top: 10px; }
 
-/* —— 跟唱 —— */
+/* —— 模唱 —— */
 .singBox { text-align: center; }
 .singPanel {
   border: 1px solid var(--kraft);
@@ -580,7 +580,7 @@ h1, h2, h3 { font-weight: 600; color: var(--slate); }
 /* 答错后的操作行：听你选的 / 听正确的 / 下一题 */
 .fbActions { margin-top: 10px; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
 
-/* —— 跟唱实时音高光条 —— */
+/* —— 模唱实时音高光条 —— */
 .singLiveWrap { position: relative; width: fit-content; margin: 0 auto; }
 .pitchBar {
   position: absolute;

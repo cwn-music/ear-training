@@ -131,11 +131,11 @@ export default function App() {
   const [picked, setPicked] = useState<string | null>(null)
   const [score, setScore] = useState(0)
   const [singing, setSinging] = useState(false)
-  const [singArmed, setSingArmed] = useState(false) // 跟唱是否已开始听音（孩子点「开始跟唱」后才开麦）
+  const [singArmed, setSingArmed] = useState(false) // 模唱是否已开始听音（孩子点「开始模唱」后才开麦）
   const [singHold, setSingHold] = useState(false) // 唱对瞬间的定格庆祝（光条钉在音符上）
-  // 跟唱结果：null=还在听；ok/heard 用于停留反馈（唱对要夸，唱错要对比）
+  // 模唱结果：null=还在听；ok/heard 用于停留反馈（唱对要夸，唱错要对比）
   const [singResult, setSingResult] = useState<{ ok: boolean; heard: number | null } | null>(null)
-  // 跟唱中实时听到的音（谱面光条用，null=收起来）
+  // 模唱中实时听到的音（谱面光条用，null=收起来）
   const [liveHeard, setLiveHeard] = useState<number | null>(null)
   // 强弱追问题的阶段：cmp=先比强弱，note=再把更响的音弹出来
   const [dynStage, setDynStage] = useState<'cmp' | 'note'>('cmp')
@@ -512,7 +512,7 @@ export default function App() {
   useEffect(() => {
     setSlotRects([])
     if (phase === 'playing' && q && !singing) {
-      const t = setTimeout(() => playQuestion(q), 350)
+      const t = setTimeout(() => { void ensureAudio().then(() => playQuestion(q)) }, 350)
       return () => clearTimeout(t)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -527,7 +527,7 @@ export default function App() {
     // 强弱追问题：第一阶段（比强弱）答对 → 进入第二阶段（把更响的音弹出来），不计分不判错
     if (q.kind === 'dynote' && dynStage === 'cmp' && id === q.answer) {
       setDynStage('note')
-      window.setTimeout(() => playTwo(q.a, q.b, { va: q.va, vb: q.vb, gap: 0.55 }), 500) // 再听一遍，找那个更响的
+      window.setTimeout(() => { void ensureAudio().then(() => playTwo(q.a, q.b, { va: q.va, vb: q.vb, gap: 0.55 })) }, 500) // 再听一遍，找那个更响的
       return
     }
     setPicked(id)
@@ -539,12 +539,12 @@ export default function App() {
 
     const isPlacement = placementStage > 0 || questions.length === 3
 
-    // 识音题答对后进入跟唱
+    // 识音题答对后进入模唱
     const needSing = ok && q.kind === 'pitch' && !isPlacement && !singing
 
     // 模唱题：麦克风评测刚结束，反馈停住不自动跳题，由学习者自己点「下一题」
     if (q.kind === 'sing') {
-      if (!ok) window.setTimeout(() => playQuestion(q), 600) // 唱错：自动重播一遍示范
+      if (!ok) window.setTimeout(() => { void ensureAudio().then(() => playQuestion(q)) }, 600) // 唱错：自动重播一遍示范
       return
     }
 
@@ -557,7 +557,7 @@ export default function App() {
     // 识音/识谱题的正误对比也改为学习者点按钮播放，不再自动播
     if (!ok && !isPlacement) {
       if (q.kind !== 'pitch' && q.kind !== 'sight' && !LONG_KINDS.includes(q.kind)) {
-        window.setTimeout(() => playQuestion(q), 750) // 其余短内容的题自动重播一遍题目
+        window.setTimeout(() => { void ensureAudio().then(() => playQuestion(q)) }, 750) // 其余短内容的题自动重播一遍题目
       }
       return
     }
@@ -570,7 +570,7 @@ export default function App() {
       if (needSing) {
         setSingResult(null)
         setLiveHeard(null)
-        setSingArmed(false) // 先停住，等孩子自己点「开始跟唱」
+        setSingArmed(false) // 先停住，等孩子自己点「开始模唱」
         setSinging(true)
         return
       }
@@ -629,7 +629,7 @@ export default function App() {
     }
   }
 
-  // 跟唱结束：不立刻跳题，停住给明确反馈；唱错时播一遍对比（你唱的 → 正确的）
+  // 模唱结束：不立刻跳题，停住给明确反馈；唱错时播一遍对比（你唱的 → 正确的）
   // 唱对时先定格 1.6s：光条钉在目标音符上变绿 +「对准了！」，让孩子看到成功的一刻，再切结果卡
   const singHoldTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const singDone = (ok: boolean, heard: number | null = null) => {
@@ -649,8 +649,10 @@ export default function App() {
     setSingResult({ ok, heard })
     if (!ok) {
       window.setTimeout(() => {
-        if (heard !== null && heard !== q.midi) playTwo(heard, q.midi, { da: 0.9, db: 0.9, gap: 0.6 })
-        else playNote(q.midi, 1.2, 0.9)
+        void ensureAudio().then(() => {
+          if (heard !== null && heard !== q.midi) playTwo(heard, q.midi, { da: 0.9, db: 0.9, gap: 0.6 })
+          else playNote(q.midi, 1.2, 0.9)
+        })
       }, 450)
     }
   }
@@ -799,7 +801,7 @@ export default function App() {
               : promptOf(q)}
           </h3>
           {q.kind !== 'sing' && q.kind !== 'playalong' && (
-            <button className="btn ghost" onClick={() => playQuestion(q)}>▶ 再听一遍</button>
+            <button className="btn ghost" onClick={() => { void ensureAudio().then(() => playQuestion(q)) }}>▶ 再听一遍</button>
           )}
 
           {q.kind === 'sight' && (
@@ -1065,7 +1067,7 @@ export default function App() {
               {q.kind === 'sing' && (
                 <div className="singNextRow">
                   {!isCorrect(q, picked) && (
-                    <button className="btn ghost small" onClick={() => playQuestion(q)}>▶ 再听一遍示范</button>
+                    <button className="btn ghost small" onClick={() => { void ensureAudio().then(() => playQuestion(q)) }}>▶ 再听一遍示范</button>
                   )}
                   <button className="btn primary" onClick={() => advance(isCorrect(q, picked), score)}>
                     {qi + 1 < questions.length ? '下一题 ›' : '查看成绩 ›'
@@ -1102,12 +1104,12 @@ export default function App() {
                 {singArmed ? (
                   <>
                     <Sing target={q.midi} ghostMic={new URLSearchParams(location.search).has('ghostMic')} onDone={singDone} onHear={setLiveHeard} />
-                    <button className="btn ghost small" onClick={() => advance(true, score)}>跳过跟唱</button>
+                    <button className="btn ghost small" onClick={() => advance(true, score)}>跳过模唱</button>
                   </>
                 ) : (
                   <>
-                    <button className="btn primary big" onClick={() => setSingArmed(true)}>🎤 开始跟唱</button>
-                    <button className="btn ghost small" onClick={() => advance(true, score)}>跳过跟唱</button>
+                    <button className="btn primary big" onClick={() => setSingArmed(true)}>🎤 开始模唱</button>
+                    <button className="btn ghost small" onClick={() => advance(true, score)}>跳过模唱</button>
                   </>
                 )}
               </>

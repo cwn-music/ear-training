@@ -1,4 +1,4 @@
-// 缪斯 Muse · 跟唱校准（pitchy 基频检测）
+// 缪斯 Muse · 模唱校准（pitchy 基频检测）
 import { useEffect, useRef, useState } from 'react'
 import { PitchDetector } from 'pitchy'
 import { displayName } from './theory'

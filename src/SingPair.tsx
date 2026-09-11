@@ -13,7 +13,7 @@ interface Props {
 }
 
 export default function SingPair({ a, b, ghostMic = false, onDone }: Props) {
-  const [armed, setArmed] = useState(false) // 孩子点「开始跟唱」后才开麦
+  const [armed, setArmed] = useState(false) // 孩子点「开始模唱」后才开麦
   const [heard, setHeard] = useState<number | null>(null) // 实时听到的音（光条用）
   return (
     <div className="singPair">
@@ -35,7 +35,7 @@ export default function SingPair({ a, b, ghostMic = false, onDone }: Props) {
           ▶ 再听两个音
         </button>
         {!armed && (
-          <button className="btn primary big" onClick={() => setArmed(true)}>🎤 开始跟唱</button>
+          <button className="btn primary big" onClick={() => setArmed(true)}>🎤 开始模唱</button>
         )}
       </div>
       {armed && (
