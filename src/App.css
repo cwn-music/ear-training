@@ -943,6 +943,7 @@ h1, h2, h3 { font-weight: 600; color: var(--slate); }
   position: absolute;
   transform: translateX(-50%);
   font-size: 0.75rem;
+  line-height: 1.3;
   color: #8a94a6;
 }
 .dmClaim {
@@ -1085,6 +1086,28 @@ h1, h2, h3 { font-weight: 600; color: var(--slate); }
   font-size: 0.78rem;
   color: #8a94a6;
 }
+/* 流程说明：钉在舞台底部一行，不与任何图形重叠 */
+.dmFlowHint {
+  position: absolute;
+  bottom: 10px; left: 0; right: 0;
+  text-align: center;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  color: #8a94a6;
+}
+/* 唱另一个音：麦克风组合（麦克风 + 对勾 + 文字标签），放在舞台右侧 */
+.dmMicBox {
+  position: absolute;
+  left: 74%; top: 16px;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+.dmMicBox .dmMic { position: relative; left: auto; top: auto; transform: none; }
+.dmMicBox .dmCheck { top: -6px; right: 6px; }
+.dmMicLabel { font-size: 0.72rem; color: #8a94a6; white-space: nowrap; }
 
 /* 减少动态偏好：静止展示 */
 @media (prefers-reduced-motion: reduce) {
@@ -1147,7 +1170,7 @@ h1, h2, h3 { font-weight: 600; color: var(--slate); }
 .paChip.miss { border-color: #c05b4d; color: #c05b4d; }
 
 /* —— 「怎么答题」小动画：跟着弹（playalong）的滚动长条 —— */
-.dmRail { position: absolute; left: 0; right: 0; top: 22px; height: 62px; }
+.dmRail { position: absolute; left: 0; right: 0; top: 14px; height: 56px; }
 .dmRailBeat { position: absolute; left: 26%; top: 0; bottom: 0; width: 3px; border-radius: 2px; background: var(--gold); }
 .dmRailBar {
   position: absolute;
