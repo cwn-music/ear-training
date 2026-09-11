@@ -8,7 +8,7 @@ const LETTERS = ['c', 'c#', 'd', 'd#', 'e', 'f', 'f#', 'g', 'g#', 'a', 'a#', 'b'
 const keyOf = (midi: number) => LETTERS[midi % 12] + '/' + (Math.floor(midi / 12) - 1)
 const needsAcc = (midi: number) => LETTERS[midi % 12].includes('#')
 
-// 音符在五线谱上的纵坐标（与绘制同一套 VexFlow 坐标系）——跟唱实时光条定位用
+// 音符在五线谱上的纵坐标（与绘制同一套 VexFlow 坐标系）——模唱实时光条定位用
 export function noteYOnStaff(midi: number, clef: Clef = 'treble', staveY = 12): number {
   const stave = new Stave(8, staveY, 100)
   const n = new StaveNote({ keys: [keyOf(midi)], duration: 'q', clef })

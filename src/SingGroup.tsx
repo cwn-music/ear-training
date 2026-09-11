@@ -1,5 +1,5 @@
 // 缪斯 Muse · 三音组模唱（pitchy 基频检测，逐音判定）
-// 判定规则与单音跟唱一致：八度折叠 + 0.75 半音容差 + 连续若干帧稳定才算唱准
+// 判定规则与单音模唱一致：八度折叠 + 0.75 半音容差 + 连续若干帧稳定才算唱准
 import { useEffect, useRef, useState } from 'react'
 import { PitchDetector } from 'pitchy'
 import { displayName } from './theory'
