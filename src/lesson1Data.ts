@@ -12,6 +12,9 @@ export const L1_TASK_IDS = [
   'L01T05', 'L01T06', 'L01T07', 'L01T08',
 ] as const
 
+// 本课已经学习的三个音；所有随机材料都只从这三个音中抽取。
+export const L1_LEARNED_PITCHES = [60, 62, 64] as const
+
 export type ChoiceTaskId = 'L01T02' | 'L01T03' | 'L01T04' | 'L01T05'
 export type ChoiceKind = 'compare' | 'sameDifferent' | 'direction'
 export type ComparisonDirection = 'secondToFirst' | 'firstToSecond'
@@ -110,6 +113,10 @@ function shuffle<T>(values: readonly T[], random: () => number): T[] {
   return result
 }
 
+function pickRandom<T>(values: readonly T[], random: () => number): T {
+  return values[Math.floor(random() * values.length)]!
+}
+
 function relationOf(kind: ChoiceKind, pitches: [number, number]): string {
   const [a, b] = pitches
   if (kind === 'sameDifferent') return a === b ? 'same' : 'different'
@@ -171,15 +178,26 @@ const BASE_TASKS: Record<ChoiceTaskId, Omit<ChoiceTaskConfig, 'items'> & { items
   },
 }
 
+function pairsForRelation(kind: ChoiceKind, relation: string): [number, number][] {
+  const pairs = L1_LEARNED_PITCHES.flatMap(first =>
+    L1_LEARNED_PITCHES.map(second => [first, second] as [number, number]),
+  )
+  return pairs.filter(pair => relationOf(kind, pair) === relation)
+}
+
 export function buildLesson1ChoiceTasks(seed: number): Record<ChoiceTaskId, ChoiceTaskConfig> {
   const random = seededRandom(seed)
   const result = {} as Record<ChoiceTaskId, ChoiceTaskConfig>
   for (const taskId of ['L01T02', 'L01T03', 'L01T04', 'L01T05'] as const) {
     const base = BASE_TASKS[taskId]
-    const materials = shuffle(base.items.map((pitches, index) => ({
-      itemId: `I0${index + 1}`,
-      pitches: [...pitches] as [number, number],
-    })), random)
+    const materials = shuffle(base.items.map((example, index) => {
+      const relation = relationOf(base.kind, example)
+      const pitches = pickRandom(pairsForRelation(base.kind, relation), random)
+      return {
+        itemId: `I0${index + 1}`,
+        pitches: [...pitches] as [number, number],
+      }
+    }), random)
     // 比较题每组保留两种问法：其中一题反向问“第一个音与第二个音相比”。
     // 提问方向只改变正确选项，不改变原始音高材料及其三类配额。
     const comparisonDirections = base.kind === 'compare'
@@ -206,6 +224,32 @@ export function buildLesson1ChoiceTasks(seed: number): Record<ChoiceTaskId, Choi
     result[taskId] = { ...base, items }
   }
   return result
+}
+
+export function buildLesson1SoundSteps(seed: number): number[] {
+  // 高、中、低各出现一次，只随机先后顺序，保留原台阶拖放规则。
+  const random = seededRandom((seed ^ 0x51ed270b) >>> 0)
+  return shuffle(L1_LEARNED_PITCHES, random)
+}
+
+export interface Lesson1EchoMaterials {
+  singleRounds: number[][]
+  phrase: number[]
+}
+
+export function buildLesson1EchoMaterials(seed: number): Lesson1EchoMaterials {
+  const random = seededRandom((seed ^ 0x2f6e2b1d) >>> 0)
+  const singleRounds = shuffle(L1_LEARNED_PITCHES, random)
+    .slice(0, 2)
+    .map(pitch => [pitch])
+
+  // 保留“三个音中有两个同音”的任务配额，但同音音高、另一个音及其位置都会变化。
+  const repeatedPitch = pickRandom(L1_LEARNED_PITCHES, random)
+  const otherPitch = pickRandom(L1_LEARNED_PITCHES.filter(pitch => pitch !== repeatedPitch), random)
+  const otherPosition = Math.floor(random() * 3)
+  const phrase = [repeatedPitch, repeatedPitch, repeatedPitch]
+  phrase[otherPosition] = otherPitch
+  return { singleRounds, phrase }
 }
 
 export function createLesson1Session(seed = randomSeed()): Lesson1Session {

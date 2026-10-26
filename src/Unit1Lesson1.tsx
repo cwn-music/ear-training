@@ -7,6 +7,8 @@ import { playLesson1Sequence, prepareLesson1Audio, stopLesson1Audio } from './le
 import {
   archiveLesson1Session,
   buildLesson1ChoiceTasks,
+  buildLesson1EchoMaterials,
+  buildLesson1SoundSteps,
   createLesson1Session,
   L1_TASK_IDS,
   loadLesson1Store,
@@ -27,7 +29,18 @@ interface Props {
 type Stage = 'intro' | 'tasks' | 'done' | 'review' | 'reviewDone'
 
 const CHOICE_TASK_IDS: ChoiceTaskId[] = ['L01T02', 'L01T03', 'L01T04', 'L01T05']
-type WrongRecord = Pick<ChoiceRecord, 'itemId' | 'firstAnswer' | 'firstAttemptCorrect'>
+type WrongRecord = Pick<
+  ChoiceRecord,
+  | 'itemId'
+  | 'pitches'
+  | 'relation'
+  | 'comparisonDirection'
+  | 'correctOptionId'
+  | 'optionOrder'
+  | 'correctIndex'
+  | 'firstAnswer'
+  | 'firstAttemptCorrect'
+>
 interface WrongEntry {
   config: ChoiceTaskConfig
   item: ChoiceItem
@@ -42,6 +55,14 @@ function wrongRecordsOf(value: unknown): WrongRecord[] {
     if (!item || typeof item !== 'object') return false
     const record = item as Partial<ChoiceRecord>
     return typeof record.itemId === 'string'
+      && Array.isArray(record.pitches)
+      && record.pitches.length === 2
+      && record.pitches.every(pitch => typeof pitch === 'number')
+      && typeof record.relation === 'string'
+      && typeof record.correctOptionId === 'string'
+      && Array.isArray(record.optionOrder)
+      && record.optionOrder.every(option => typeof option === 'string')
+      && typeof record.correctIndex === 'number'
       && typeof record.firstAnswer === 'string'
       && record.firstAttemptCorrect === false
   })
@@ -55,8 +76,17 @@ function collectWrongEntries(
   for (const taskId of CHOICE_TASK_IDS) {
     const config = tasks[taskId]
     for (const record of wrongRecordsOf(session?.records[taskId])) {
-      const item = config.items.find(candidate => candidate.itemId === record.itemId)
-      if (item) entries.push({ config, item, firstAnswer: record.firstAnswer })
+      // 直接读取答题时保存的题目快照；随机生成逻辑升级后，旧错题仍能按原音高重听和订正。
+      const item: ChoiceItem = {
+        itemId: record.itemId,
+        pitches: [...record.pitches],
+        relation: record.relation,
+        ...(record.comparisonDirection ? { comparisonDirection: record.comparisonDirection } : {}),
+        correctOptionId: record.correctOptionId,
+        optionOrder: [...record.optionOrder],
+        correctIndex: record.correctIndex,
+      }
+      entries.push({ config, item, firstAnswer: record.firstAnswer })
     }
   }
   return entries
@@ -94,6 +124,8 @@ export default function Unit1Lesson1({ onBack, onLessonComplete }: Props) {
   const reviewPlayRequestRef = useRef(0)
 
   const choiceTasks = useMemo(() => buildLesson1ChoiceTasks(session?.seed ?? 1), [session?.seed])
+  const soundStepSequence = useMemo(() => buildLesson1SoundSteps(session?.seed ?? 1), [session?.seed])
+  const echoMaterials = useMemo(() => buildLesson1EchoMaterials(session?.seed ?? 1), [session?.seed])
   const wrongEntries = useMemo(() => collectWrongEntries(session, choiceTasks), [session, choiceTasks])
   const reviewConfigs = useMemo(() => {
     const groups: ChoiceTaskConfig[] = []
@@ -348,9 +380,9 @@ export default function Unit1Lesson1({ onBack, onLessonComplete }: Props) {
         {taskIndex === 2 && <Lesson1Choice config={choiceTasks.L01T03} replayNonce={replayNonce} onDone={record => finishTask(2, record)} />}
         {taskIndex === 3 && <Lesson1Choice config={choiceTasks.L01T04} replayNonce={replayNonce} onDone={record => finishTask(3, record)} />}
         {taskIndex === 4 && <Lesson1Choice config={choiceTasks.L01T05} replayNonce={replayNonce} onDone={record => finishTask(4, record)} />}
-        {taskIndex === 5 && <SoundStepsTask replayNonce={replayNonce} onDone={record => finishTask(5, record)} />}
-        {taskIndex === 6 && <Lesson1Echo taskId="L01T07" replayNonce={replayNonce} onDone={record => finishTask(6, record)} />}
-        {taskIndex === 7 && <Lesson1Echo taskId="L01T08" replayNonce={replayNonce} onDone={record => finishTask(7, record)} />}
+        {taskIndex === 5 && <SoundStepsTask sequence={soundStepSequence} replayNonce={replayNonce} onDone={record => finishTask(5, record)} />}
+        {taskIndex === 6 && <Lesson1Echo taskId="L01T07" materials={echoMaterials} replayNonce={replayNonce} onDone={record => finishTask(6, record)} />}
+        {taskIndex === 7 && <Lesson1Echo taskId="L01T08" materials={echoMaterials} replayNonce={replayNonce} onDone={record => finishTask(7, record)} />}
       </div>
     </main>
   )

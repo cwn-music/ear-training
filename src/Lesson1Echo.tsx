@@ -2,9 +2,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { PitchDetector } from 'pitchy'
 import { playLesson1Sequence, stopLesson1Audio } from './lesson1Audio'
+import type { Lesson1EchoMaterials } from './lesson1Data'
 
 interface Props {
   taskId: 'L01T07' | 'L01T08'
+  materials: Lesson1EchoMaterials
   replayNonce: number
   onDone: (record: Record<string, unknown>) => void
 }
@@ -15,9 +17,6 @@ interface Participation {
   micPermissionState: string
 }
 
-const SINGLE_ROUNDS = [[64], [62]]
-const FULL_PHRASE = [62, 64, 64]
-const PHRASE_GROUPS = [[62, 64], [64, 64]]
 const DEFAULT_PARTICIPATION: Participation = {
   participated: false,
   usedMic: false,
@@ -33,13 +32,19 @@ function MicIcon() {
   )
 }
 
-function EchoPath() {
+function EchoPath({ notes }: { notes: number[] }) {
+  const min = Math.min(...notes)
+  const max = Math.max(...notes)
+  const xs = [48, 150, 232]
+  const points = notes.map((note, index) => ({
+    x: xs[index],
+    y: max === min ? 56 : 78 - (note - min) / (max - min) * 44,
+  }))
+  const path = points.map((point, index) => `${index === 0 ? 'M' : 'L'}${point.x} ${point.y}`).join(' ')
   return (
-    <svg className="l1-echo-path" viewBox="0 0 280 110" role="img" aria-label="声音先往上走，第二个和第三个音一样高">
-      <path d="M48 78C105 78 108 34 150 34S205 34 232 34" />
-      <circle cx="48" cy="78" r="10" />
-      <circle cx="150" cy="34" r="10" />
-      <circle cx="232" cy="34" r="10" />
+    <svg className="l1-echo-path" viewBox="0 0 280 110" role="img" aria-label="三个音的高低与顺序示意">
+      <path d={path} />
+      {points.map((point, index) => <circle key={index} cx={point.x} cy={point.y} r="10" />)}
     </svg>
   )
 }
@@ -51,6 +56,7 @@ interface PitchAssessment {
   matchedNotes: number
   totalNotes: number
   heardMidi: number | null
+  needsSeparatedRepeat?: boolean
 }
 
 interface PitchMonitor {
@@ -103,6 +109,7 @@ function createPitchMonitor(
   targets: number[],
   onProgress: (matchedNotes: number) => void,
   onHear: (midi: number | null) => void,
+  onRepeatWait: (waiting: boolean) => void,
 ): PitchMonitor {
   const context = new AudioContext()
   const source = context.createMediaStreamSource(stream)
@@ -125,6 +132,14 @@ function createPitchMonitor(
   let hearing = false
   let lastHeardAt = 0
   let lastHeardUpdateAt = 0
+  let waitingForRepeatedNote = false
+  let repeatGapStartedAt: number | null = null
+
+  const setRepeatWaiting = (waiting: boolean) => {
+    if (waitingForRepeatedNote === waiting) return
+    waitingForRepeatedNote = waiting
+    onRepeatWait(waiting)
+  }
 
   const cleanup = () => {
     if (cleaned) return
@@ -157,17 +172,28 @@ function createPitchMonitor(
         : bestNearStreak > 0
           ? 'unstable'
           : heardMidi !== null ? 'different' : 'unclear'
-    cached = { status, matchedNotes, totalNotes: targets.length, heardMidi }
+    const needsSeparatedRepeat = matchedNotes > 0
+      && matchedNotes < targets.length
+      && targets[matchedNotes] === targets[matchedNotes - 1]
+    cached = { status, matchedNotes, totalNotes: targets.length, heardMidi, needsSeparatedRepeat }
     return cached
   }
 
   const loop = () => {
     if (cleaned || !monitoring) return
     analyser.getFloatTimeDomainData(buffer)
+    let squareSum = 0
+    for (const sample of buffer) squareSum += sample * sample
+    const rms = Math.sqrt(squareSum / buffer.length)
     const [frequency, clarity] = detector.findPitch(buffer, context.sampleRate)
-    if (targetIndex < targets.length && clarity > clarityThreshold && frequency > 50 && frequency < 1200) {
-      const midi = midiOfFreq(frequency)
-      const now = performance.now()
+    const hasPitch = targetIndex < targets.length
+      && clarity > clarityThreshold
+      && frequency > 50
+      && frequency < 1200
+    const midi = hasPitch ? midiOfFreq(frequency) : null
+    const now = performance.now()
+
+    if (midi !== null) {
       lastHeardAt = now
       if (!hearing || now - lastHeardUpdateAt >= 50) {
         hearing = true
@@ -176,11 +202,45 @@ function createPitchMonitor(
       }
       const rounded = Math.round(midi)
       heardCounts.set(rounded, (heardCounts.get(rounded) ?? 0) + 1)
+    } else {
+      streak = 0
+      if (hearing && now - lastHeardAt > 300) {
+        hearing = false
+        onHear(null)
+      }
+    }
+
+    if (targetIndex < targets.length && waitingForRepeatedNote) {
+      // 相邻同音不能沿用上一次发声：接近静音且当前目标音也中断，才开始计算 100ms 分段间隔。
+      // 既不把长音衰减当作停顿，也不被静音中的低频假音高阻止分段。
+      const targetStillSounding = midi !== null
+        && Math.abs(octaveFoldedDiff(midi, targets[targetIndex])) <= 0.75
+      const hasQuietGap = rms <= 0.025 && !targetStillSounding
+      if (hasQuietGap) {
+        if (repeatGapStartedAt === null) repeatGapStartedAt = now
+      } else {
+        repeatGapStartedAt = null
+      }
+      streak = 0
+      if (repeatGapStartedAt !== null && now - repeatGapStartedAt >= 100) {
+        repeatGapStartedAt = null
+        setRepeatWaiting(false)
+        if (hearing) {
+          hearing = false
+          onHear(null)
+        }
+      }
+      raf = requestAnimationFrame(loop)
+      return
+    }
+
+    if (midi !== null && targetIndex < targets.length) {
       const near = Math.abs(octaveFoldedDiff(midi, targets[targetIndex])) <= 0.75
       if (near) {
         streak += 1
         bestNearStreak = Math.max(bestNearStreak, streak)
         if (streak >= needFrames) {
+          const matchedTarget = targets[targetIndex]
           if (targets.length === 1) {
             singleMatched = true
             targetIndex = 1
@@ -195,15 +255,13 @@ function createPitchMonitor(
             monitoring = false
             return
           }
+          if (targets[targetIndex] === matchedTarget) {
+            repeatGapStartedAt = null
+            setRepeatWaiting(true)
+          }
         }
       } else {
         streak = 0
-      }
-    } else {
-      streak = 0
-      if (hearing && performance.now() - lastHeardAt > 300) {
-        hearing = false
-        onHear(null)
       }
     }
     raf = requestAnimationFrame(loop)
@@ -231,7 +289,9 @@ function pitchFeedbackCopy(assessment: PitchAssessment) {
       return {
         tone: 'matched',
         title: `前 ${assessment.matchedNotes} 个音已经对准。`,
-        detail: '再听一次示范，接着练后面的音；也可以用分组练。',
+        detail: assessment.needsSeparatedRepeat
+          ? '相邻的同音也要分开唱：稍停一下，再单独唱下一个音。'
+          : '再听一次示范，接着练后面的音；也可以用分组练。',
       }
     case 'unstable':
       return {
@@ -262,14 +322,18 @@ function pitchFeedbackCopy(assessment: PitchAssessment) {
   }
 }
 
-export default function Lesson1Echo({ taskId, replayNonce, onDone }: Props) {
+export default function Lesson1Echo({ taskId, materials, replayNonce, onDone }: Props) {
   const isPhrase = taskId === 'L01T08'
+  const singleRounds = materials.singleRounds
+  const fullPhrase = materials.phrase
+  const phraseGroups = useMemo(() => [fullPhrase.slice(0, 2), fullPhrase.slice(1)], [fullPhrase])
   const [round, setRound] = useState(0)
   const [group, setGroup] = useState<number | null>(null)
   const [participation, setParticipation] = useState<Record<string, Participation>>({})
   const [assessments, setAssessments] = useState<Record<string, PitchAssessment>>({})
   const [liveMatchedNotes, setLiveMatchedNotes] = useState(0)
   const [liveMidi, setLiveMidi] = useState<number | null>(null)
+  const [waitingForRepeatedNote, setWaitingForRepeatedNote] = useState(false)
   const [retryCounts, setRetryCounts] = useState<Record<string, number>>({})
   const [usedSegmentSupport, setUsedSegmentSupport] = useState(false)
   const [audioUrl, setAudioUrl] = useState<string | null>(null)
@@ -296,9 +360,9 @@ export default function Lesson1Echo({ taskId, replayNonce, onDone }: Props) {
 
   const currentKey = isPhrase ? (group === null ? 'full' : `group-${group}`) : `single-${round}`
   const currentNotes = useMemo(() => {
-    if (isPhrase) return group === null ? FULL_PHRASE : PHRASE_GROUPS[group]
-    return SINGLE_ROUNDS[round]
-  }, [isPhrase, group, round])
+    if (isPhrase) return group === null ? fullPhrase : phraseGroups[group]
+    return singleRounds[round]
+  }, [fullPhrase, group, isPhrase, phraseGroups, round, singleRounds])
   const currentParticipation = participation[currentKey] ?? DEFAULT_PARTICIPATION
   const currentAssessment = assessments[currentKey] ?? null
   const pitchFeedback = currentAssessment ? pitchFeedbackCopy(currentAssessment) : null
@@ -328,6 +392,7 @@ export default function Lesson1Echo({ taskId, replayNonce, onDone }: Props) {
     cancelPitchMonitor()
     setLiveMatchedNotes(0)
     setLiveMidi(null)
+    setWaitingForRepeatedNote(false)
     setAssessments(previous => {
       if (!previous[currentKey]) return previous
       const next = { ...previous }
@@ -447,6 +512,9 @@ export default function Lesson1Echo({ taskId, replayNonce, onDone }: Props) {
           midi => {
             if (mountedRef.current) setLiveMidi(midi)
           },
+          waiting => {
+            if (mountedRef.current) setWaitingForRepeatedNote(waiting)
+          },
         )
       } catch {
         // 录音仍可使用；只是本次设备无法完成音高分析。
@@ -544,7 +612,7 @@ export default function Lesson1Echo({ taskId, replayNonce, onDone }: Props) {
       } else {
         onDone({
           taskId,
-          rounds: SINGLE_ROUNDS.map((notes, index) => ({
+          rounds: singleRounds.map((notes, index) => ({
             pitch: notes[0],
             ...(participation[`single-${index}`] ?? DEFAULT_PARTICIPATION),
             pitchAssessment: assessments[`single-${index}`] ?? notAssessed(1),
@@ -559,16 +627,16 @@ export default function Lesson1Echo({ taskId, replayNonce, onDone }: Props) {
 
     if (group === 0) {
       setGroup(1)
-      setMessage('现在练第二组，注意两个音一样高。')
+      setMessage('现在练第二组，按顺序把两个音分开唱。')
     } else if (group === 1) {
       setGroup(null)
       setMessage('回到完整三音，按顺序唱回去。')
     } else {
       onDone({
         taskId,
-        sequence: FULL_PHRASE,
+        sequence: fullPhrase,
         ...(participation.full ?? DEFAULT_PARTICIPATION),
-        pitchAssessment: assessments.full ?? notAssessed(FULL_PHRASE.length),
+        pitchAssessment: assessments.full ?? notAssessed(fullPhrase.length),
         usedSegmentSupport,
         retryCount: retryCounts.full ?? 0,
         completed: true,
@@ -629,7 +697,11 @@ export default function Lesson1Echo({ taskId, replayNonce, onDone }: Props) {
   }, [])
 
   const title = isPhrase ? '听三个音，按顺序唱回去。' : '听一个音，把它唱回去。'
-  const guide = isPhrase ? '这条短句里，有两个音一样高。' : '用“唔”或“啦”都可以。'
+  const guide = !isPhrase
+    ? '用“唔”或“啦”都可以。'
+    : group === null
+      ? '这条短句里，有两个音一样高；每个音都要分开唱。'
+      : '按顺序唱两个音；如果同音相邻，要分开唱。'
   const continueLabel = !isPhrase
     ? '继续'
     : group === 0
@@ -648,7 +720,7 @@ export default function Lesson1Echo({ taskId, replayNonce, onDone }: Props) {
         <div className="l1-order-markers" aria-label={`共 ${currentNotes.length} 个音`}>
           {currentNotes.map((_, index) => <span key={index}>{index + 1}</span>)}
         </div>
-        {isPhrase && group === null && currentParticipation.participated && <EchoPath />}
+        {isPhrase && group === null && currentParticipation.participated && <EchoPath notes={currentNotes} />}
       </div>
 
       <p className="l1-echo-message" aria-live="polite">{message}</p>
@@ -661,11 +733,13 @@ export default function Lesson1Echo({ taskId, replayNonce, onDone }: Props) {
       )}
       {recording && (
         <p className="l1-pitch-live" aria-live="polite">
-          {liveMatchedNotes > 0
-            ? currentNotes.length === 1
-              ? '这个音已经对准，可以保持到松开。'
-              : `已按顺序对准 ${liveMatchedNotes} / ${currentNotes.length} 个音。`
-            : '正在这台设备上判断音高…'}
+          {waitingForRepeatedNote
+            ? `第 ${liveMatchedNotes} 个音已对准。稍停一下，再单独唱下一个同音。`
+            : liveMatchedNotes > 0
+              ? currentNotes.length === 1
+                ? '这个音已经对准，可以保持到松开。'
+                : `已按顺序对准 ${liveMatchedNotes} / ${currentNotes.length} 个音。`
+              : '正在这台设备上判断音高…'}
         </p>
       )}
       {!recording && pitchFeedback && currentAssessment?.status !== 'notAssessed' && (

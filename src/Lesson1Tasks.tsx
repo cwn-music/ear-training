@@ -124,9 +124,9 @@ export function GuidedHandTask({ replayNonce, onDone }: TaskProps) {
 }
 
 type StepLevel = 'high' | 'middle' | 'low'
-const STEP_SEQUENCE = [64, 62, 60]
 const STEP_TARGETS: StepLevel[] = ['high', 'middle', 'low']
 const STEP_LABELS: Record<StepLevel, string> = { high: '高', middle: '中', low: '低' }
+const stepLevelOf = (pitch: number): StepLevel => pitch === 64 ? 'high' : pitch === 62 ? 'middle' : 'low'
 
 function stepAtPoint(x: number, y: number, dragSource: HTMLElement): StepLevel | null {
   // 海螺位于指针下方，暂时跳过它才能读到真正的台阶落点。
@@ -138,7 +138,7 @@ function stepAtPoint(x: number, y: number, dragSource: HTMLElement): StepLevel |
   return level === 'high' || level === 'middle' || level === 'low' ? level : null
 }
 
-export function SoundStepsTask({ replayNonce, onDone }: TaskProps) {
+export function SoundStepsTask({ replayNonce, onDone, sequence }: TaskProps & { sequence: number[] }) {
   const [stepIndex, setStepIndex] = useState(0)
   const [placements, setPlacements] = useState<{ step: number; pitch: number; target: StepLevel }[]>([])
   const [errors, setErrors] = useState([0, 0, 0])
@@ -153,7 +153,7 @@ export function SoundStepsTask({ replayNonce, onDone }: TaskProps) {
   const dragRef = useRef({ pointerId: -1, x: 0, y: 0, moved: false })
   const suppressClickRef = useRef(false)
   const startedAtRef = useRef(Date.now())
-  const completed = stepIndex >= STEP_SEQUENCE.length
+  const completed = stepIndex >= sequence.length
 
   const playCurrent = useCallback(async (manual = false) => {
     if (completed) return
@@ -161,13 +161,13 @@ export function SoundStepsTask({ replayNonce, onDone }: TaskProps) {
     setPlaying(true)
     setError(false)
     try {
-      const completedPlayback = await playLesson1Sequence([STEP_SEQUENCE[stepIndex]], { noteMs: 600, gapMs: 300 })
+      const completedPlayback = await playLesson1Sequence([sequence[stepIndex]], { noteMs: 600, gapMs: 300 })
       if (completedPlayback) setPlaying(false)
     } catch {
       setPlaying(false)
       setError(true)
     }
-  }, [completed, stepIndex])
+  }, [completed, sequence, stepIndex])
 
   const playAll = useCallback(async (manual = false, thenCurrent = false, revealSteps = false) => {
     if (manual) setReplayCount(value => value + 1)
@@ -175,13 +175,13 @@ export function SoundStepsTask({ replayNonce, onDone }: TaskProps) {
     setError(false)
     setSoundingStep(null)
     try {
-      const done = await playLesson1Sequence(STEP_SEQUENCE, {
+      const done = await playLesson1Sequence(sequence, {
         noteMs: 600,
         gapMs: 250,
         onNote: index => { if (revealSteps) setSoundingStep(index) },
       })
       if (done && thenCurrent && !completed) {
-        const currentDone = await playLesson1Sequence([STEP_SEQUENCE[stepIndex]], { noteMs: 600, gapMs: 300 })
+        const currentDone = await playLesson1Sequence([sequence[stepIndex]], { noteMs: 600, gapMs: 300 })
         if (currentDone) setPlaying(false)
       } else if (done) {
         setPlaying(false)
@@ -192,7 +192,7 @@ export function SoundStepsTask({ replayNonce, onDone }: TaskProps) {
     } finally {
       setSoundingStep(null)
     }
-  }, [completed, stepIndex])
+  }, [completed, sequence, stepIndex])
 
   useEffect(() => {
     setSelected(false)
@@ -202,13 +202,13 @@ export function SoundStepsTask({ replayNonce, onDone }: TaskProps) {
     else if (stepIndex === 0) void playAll(false, true, false)
     else void playCurrent()
     return () => stopLesson1Audio()
-  }, [stepIndex, replayNonce])
+  }, [stepIndex, replayNonce, sequence])
 
   const attemptPlace = (target: StepLevel) => {
     if (playing || completed) return
     const current = stepIndex
-    if (target === STEP_TARGETS[current]) {
-      const placement = { step: current, pitch: STEP_SEQUENCE[current], target }
+    if (target === stepLevelOf(sequence[current])) {
+      const placement = { step: current, pitch: sequence[current], target }
       setPlacements(previous => [...previous, placement])
       setFeedback('放好了。接着听下一个音。')
       setSelected(false)
@@ -330,7 +330,7 @@ export function SoundStepsTask({ replayNonce, onDone }: TaskProps) {
         {completed && (
           <button className="btn primary" disabled={playing} onClick={() => onDone({
             taskId: 'L01T06',
-            sequence: STEP_SEQUENCE,
+            sequence,
             placements,
             errorCountByStep: errors,
             replayCount,
