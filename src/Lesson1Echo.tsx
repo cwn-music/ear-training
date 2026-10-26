@@ -60,16 +60,49 @@ interface PitchMonitor {
 
 const midiOfFreq = (frequency: number) => 69 + 12 * Math.log2(frequency / 440)
 const octaveFoldedDiff = (midi: number, target: number) => (((midi - target) % 12) + 18) % 12 - 6
+
+function LivePitchIndicator({ midi, target }: { midi: number | null; target: number }) {
+  const offset = midi === null ? null : midi - target
+  const clampedOffset = offset === null ? 0 : Math.max(-6, Math.min(6, offset))
+  const position = (clampedOffset + 6) / 12 * 100
+  const near = midi !== null && Math.abs(octaveFoldedDiff(midi, target)) <= 0.75
+  const direction = midi === null
+    ? '等待你的声音'
+    : near
+      ? '已接近目标音高'
+      : offset !== null && offset > 0
+        ? '当前声音偏高'
+        : offset !== null && offset < 0 ? '当前声音偏低' : '当前声音与目标同高'
+
+  return (
+    <div className="l1-live-pitch-panel">
+      <div className="l1-live-pitch" role="img" aria-label={`实时音高：${direction}`}>
+        <span className="l1-pitch-level high">高</span>
+        <span className="l1-pitch-level low">低</span>
+        <div className="l1-live-pitch-track" aria-hidden="true">
+          <span className="l1-pitch-target-line" />
+          {midi === null
+            ? <span className="l1-live-pitch-placeholder">等待你的声音</span>
+            : <span className={'l1-live-pitch-bar' + (near ? ' near' : '')} style={{ bottom: `${position}%` }} />}
+        </div>
+        <span className="l1-pitch-target-label" aria-hidden="true">目标</span>
+      </div>
+      <p className="l1-live-pitch-tip">光条跟着你的声音高低移动，变绿表示对准。</p>
+    </div>
+  )
+}
+
 const notAssessed = (totalNotes: number): PitchAssessment => ({
   status: 'notAssessed', matchedNotes: 0, totalNotes, heardMidi: null,
 })
 
 // 与旧版 Sing / SingGroup 一致：八度折叠、0.75 半音容差、连续稳定帧才算对准。
-// 第1课只把结果变成非分数反馈，不在学生端显示音名、频率、曲线或五线谱。
+// 不显示音名、频率、曲线或五线谱；只用高低光条提供实时位置反馈。
 function createPitchMonitor(
   stream: MediaStream,
   targets: number[],
   onProgress: (matchedNotes: number) => void,
+  onHear: (midi: number | null) => void,
 ): PitchMonitor {
   const context = new AudioContext()
   const source = context.createMediaStreamSource(stream)
@@ -89,6 +122,9 @@ function createPitchMonitor(
   let bestNearStreak = 0
   let singleMatched = false
   let cached: PitchAssessment | null = null
+  let hearing = false
+  let lastHeardAt = 0
+  let lastHeardUpdateAt = 0
 
   const cleanup = () => {
     if (cleaned) return
@@ -131,6 +167,13 @@ function createPitchMonitor(
     const [frequency, clarity] = detector.findPitch(buffer, context.sampleRate)
     if (targetIndex < targets.length && clarity > clarityThreshold && frequency > 50 && frequency < 1200) {
       const midi = midiOfFreq(frequency)
+      const now = performance.now()
+      lastHeardAt = now
+      if (!hearing || now - lastHeardUpdateAt >= 50) {
+        hearing = true
+        lastHeardUpdateAt = now
+        onHear(midi)
+      }
       const rounded = Math.round(midi)
       heardCounts.set(rounded, (heardCounts.get(rounded) ?? 0) + 1)
       const near = Math.abs(octaveFoldedDiff(midi, targets[targetIndex])) <= 0.75
@@ -158,6 +201,10 @@ function createPitchMonitor(
       }
     } else {
       streak = 0
+      if (hearing && performance.now() - lastHeardAt > 300) {
+        hearing = false
+        onHear(null)
+      }
     }
     raf = requestAnimationFrame(loop)
   }
@@ -222,6 +269,7 @@ export default function Lesson1Echo({ taskId, replayNonce, onDone }: Props) {
   const [participation, setParticipation] = useState<Record<string, Participation>>({})
   const [assessments, setAssessments] = useState<Record<string, PitchAssessment>>({})
   const [liveMatchedNotes, setLiveMatchedNotes] = useState(0)
+  const [liveMidi, setLiveMidi] = useState<number | null>(null)
   const [retryCounts, setRetryCounts] = useState<Record<string, number>>({})
   const [usedSegmentSupport, setUsedSegmentSupport] = useState(false)
   const [audioUrl, setAudioUrl] = useState<string | null>(null)
@@ -279,6 +327,7 @@ export default function Lesson1Echo({ taskId, replayNonce, onDone }: Props) {
   const clearPitchAssessment = () => {
     cancelPitchMonitor()
     setLiveMatchedNotes(0)
+    setLiveMidi(null)
     setAssessments(previous => {
       if (!previous[currentKey]) return previous
       const next = { ...previous }
@@ -389,9 +438,16 @@ export default function Lesson1Echo({ taskId, replayNonce, onDone }: Props) {
         setMessage(blob.size > 0 ? '唱完了，可以再听一次。' : '已经完成一次模仿，也可以再试一次。')
       }
       try {
-        pitchMonitorRef.current = createPitchMonitor(stream, currentNotes, matchedNotes => {
-          if (mountedRef.current) setLiveMatchedNotes(matchedNotes)
-        })
+        pitchMonitorRef.current = createPitchMonitor(
+          stream,
+          currentNotes,
+          matchedNotes => {
+            if (mountedRef.current) setLiveMatchedNotes(matchedNotes)
+          },
+          midi => {
+            if (mountedRef.current) setLiveMidi(midi)
+          },
+        )
       } catch {
         // 录音仍可使用；只是本次设备无法完成音高分析。
         pitchAssessmentRef.current = {
@@ -597,6 +653,12 @@ export default function Lesson1Echo({ taskId, replayNonce, onDone }: Props) {
 
       <p className="l1-echo-message" aria-live="polite">{message}</p>
       {micMessage && <p className="l1-mic-message">{micMessage}</p>}
+      {recording && (
+        <LivePitchIndicator
+          midi={liveMidi}
+          target={currentNotes[Math.min(liveMatchedNotes, currentNotes.length - 1)]}
+        />
+      )}
       {recording && (
         <p className="l1-pitch-live" aria-live="polite">
           {liveMatchedNotes > 0

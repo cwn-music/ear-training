@@ -721,7 +721,7 @@ export default function App() {
       <button className="coverBtn" onClick={enterFromCover} aria-label="轻点海螺，进入学习">
         <span className="coverFrame">
           <span className="coverImgBox">
-            <img className="hero cover" src="/muse.webp" alt="缪斯 Muse" />
+            <img className="hero cover" src="/muse.webp" alt="" />
             <span className="conchRipple" aria-hidden="true" />
           </span>
           <span className="coverHint">轻点海螺 · 进入学习</span>
