@@ -19,17 +19,19 @@ html {
   font-size: clamp(16px, 0.2vw + 15.7px, 20px);
 }
 
-/* 自定义字体：把字体文件放进 public/fonts/ 即可生效
-   支持三种文件名（放任意一个就行）：main.woff2 / main.ttf / main.otf */
+/* Noto Sans SC 可变字体：一个文件覆盖 wght 100–900 全部字重
+   （裁剪自用户提供的 NotoSansSC[wght].ttf：ASCII + 一级字库 + 项目用到的全部字符）
+   调粗细直接用 font-weight 数字，无需再放其他字体文件 */
 @font-face {
-  font-family: 'MuseCustom';
-  src: url('/fonts/main.woff2') format('woff2');
+  font-family: 'Noto Sans SC';
+  src: url('/fonts/NotoSansSC.woff2') format('woff2');
+  font-weight: 100 900;
   font-display: swap; /* 字体加载期间先用系统字体，加载完自动切换 */
 }
 
 body {
   margin: 0;
-  font-family: 'MuseCustom', 'Noto Serif SC', 'Songti SC', serif;
+  font-family: 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif;
   font-size: 1.125rem;
   line-height: 1.75;
   background: var(--paper);
@@ -678,7 +680,7 @@ h1, h2, h3 { font-weight: 600; color: var(--slate); }
 }
 .dictHead { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .dictName {
-  font-family: 'MuseCustom', "Songti SC", "Noto Serif SC", serif;
+  font-family: 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif;
   font-size: 1.0625rem;
   letter-spacing: 0.12em;
   color: #22304a;
