@@ -21,8 +21,9 @@ import SingPair from './SingPair'
 import PlayAlong from './PlayAlong'
 import Piano from './Piano'
 import Learn from './Learn'
+import Unit1Lesson1 from './Unit1Lesson1'
 
-type Phase = 'home' | 'map' | 'learn' | 'playing' | 'done' | 'placementDone'
+type Phase = 'home' | 'map' | 'lesson1' | 'learn' | 'playing' | 'done' | 'placementDone'
 
 const QUIZ_COUNT = 8
 const PASS_SCORE = 6
@@ -668,6 +669,17 @@ export default function App() {
     }, 1150)
   }
 
+  // 新第1课独立完成八个任务后，沿用原有关卡解锁与连续打卡规则。
+  const completeLesson1 = () => {
+    const today = new Date().toISOString().slice(0, 10)
+    const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10)
+    const count = streak.last === today ? streak.count : streak.last === yesterday ? streak.count + 1 : 1
+    const next = { count, last: today }
+    setStreak(next)
+    save(P_STREAK, next)
+    setMaxUnlocked(Math.max(maxUnlocked, 2))
+  }
+
   // —— 多设备进度同步：导出/导入同步码 ——
   const syncCode = () => {
     try {
@@ -745,7 +757,7 @@ export default function App() {
                   key={id}
                   className={'lessonNode' + (locked ? ' locked' : done ? ' done' : '')}
                   disabled={locked}
-                  onClick={() => { warmup(); setLevel(id); setPhase('learn') }}
+                  onClick={() => { warmup(); setLevel(id); setPhase(id === 1 ? 'lesson1' : 'learn') }}
                 >
                   {done && <img className="badgeIcon" src="/badges/conch.png" alt="" />}
                   <span className="lessonNum">{id}</span>
@@ -1252,6 +1264,7 @@ export default function App() {
     <div className="appShell">
       {phase === 'home' && home}
       {phase === 'map' && map}
+      {phase === 'lesson1' && <Unit1Lesson1 onBack={() => setPhase('map')} onLessonComplete={completeLesson1} />}
       {phase === 'learn' && <Learn lessonId={level} onStart={() => startLevel(level)} onBack={() => setPhase('map')} />}
       {phase === 'playing' && playing}
       {phase === 'done' && done}

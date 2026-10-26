@@ -9,7 +9,7 @@ export const UNITS: Unit[] = [
 ]
 
 export const LESSONS: Lesson[] = [
-  { id: 1, title: '认识琴键', goal: '认识 do re mi 三个白键，听声音、看位置、说名字' },
+  { id: 1, title: '声音有高低', goal: '不看谱、不记唱名，听出更高、相同、更低与声音走向，并愿意模仿' },
   { id: 2, title: '声音的高低', goal: '听辨两个音哪个更高，看它们在琴键上的位置' },
   { id: 3, title: '声音的长短', goal: '听辨哪个音更长' },
   { id: 4, title: '声音的强弱', goal: '听辨哪个音更响' },
