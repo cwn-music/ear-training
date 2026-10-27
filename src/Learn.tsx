@@ -6,7 +6,7 @@ import { INTERVAL_NAMES, displayName, type Clef } from './theory'
 import Staff from './Staff'
 import Piano from './Piano'
 import RhythmDict, { COMBO_ENTRIES } from './RhythmDict'
-import HowToDemo, { LESSON_DEMOS } from './HowToDemo'
+import HowToDemo, { LESSON_DEMOS, Lesson3IntroDemo, Lesson3StaffHomes } from './HowToDemo'
 
 interface Props {
   lessonId: number
@@ -33,7 +33,7 @@ const INTERVAL_DESCS: Record<number, string> = {
 const HOWTO: Record<number, string[]> = {
   1: ['先听播放的音，同时琴键上会亮出它的位置', '在选项里点它的名字（do / re / mi）', '答错也没关系：正确答案会标绿，点按钮就能听你选的和正确的，对比好了再进下一题'],
   2: ['「比高低」：先后播放两个音，判断第二个音更高还是更低', '「唱另一个音」：先后播放两个音，第一个是 do/re/mi 会告诉你，把第二个音唱出来（用麦克风）', '「弹另一个音」：第一个音的琴键亮着①，把听到的第二个音在琴键上弹出来', '不确定就点「再听一遍」，不限次数'],
-  3: ['「比长短」：先后播放两个音，判断第二个音更长还是更短', '「跟着弹」：彩色长条从右边滚向金色节拍线，碰到线就按它那一行的琴键', '没跟上不用慌——音乐会停下来等你，按对了再继续走'],
+  3: ['先听声音或看谱面，再点答案，不用抢时间', '摆音符可以拖动，也可以先点音符、再点它的位置', '答错可以重听，并在原题再试；已经完成的配对会保留'],
   4: ['「比强弱」：先后播放两个音，判断第二个音更响还是更轻', '「强弱找音」：答对强弱后，把更响的那个音在琴键上弹出来'],
   5: ['先看谱面上音符的位置，再听它的声音', '在选项里点它的名字', '「摆音符」题：听一个音，在谱面上点发光的圆圈，把它放回自己的位置', '「对不对」题：谱上标的名字，你觉得对就点 ✓，不对就点 ✗', '从 do 或 sol 出发，一格一格数到它的位置'],
   6: ['两个音会一起响起', '判断它们之间的距离（音程）是几度', '两个音隔得越远，音程越宽'],
@@ -182,16 +182,19 @@ export default function Learn({ lessonId, onStart, onBack }: Props) {
             </Card>
           </>
         )
+      // 第3课本批只更新课首说明与做题示范；题目生成和作答流程仍保留既有实现。
       case 3:
         return (
           <>
-            <Card title="声音有长有短">
-              <p>一个音可以很短，也可以拖得很长。长与短由它持续的时间决定。</p>
-              <PlayBtn label="短" onPlay={() => playNote(60, 0.25)} />
-              <PlayBtn label="长" onPlay={() => playNote(60, 1.6)} />
+            <Card title="它们在高音谱表上的家">
+              <p>点一个位置，听声音、读唱名。三个音都画成四分音符。</p>
+              <Lesson3StaffHomes active={page === 1} />
+              <p className="tip">本单元先固定这三个家：do 在下加一线，re 在下加一间，mi 在第一线。</p>
             </Card>
             <Card title="今天要练">
-              <p>听两个音，说出第二个音更长还是更短；再跟着滚动的长条，把 do re mi 按节拍弹出来。</p>
+              <p>先复习听音选名，再把熟悉的声音和唱名迁移到谱面。</p>
+              <p>你会看谱选名字、听音找位置，也会把同一个声音的“声音卡、唱名卡、谱面卡”连起来。</p>
+              <p className="tip">只看音高位置，本课不比较声音长短，也不评价节奏。</p>
             </Card>
           </>
         )
@@ -438,7 +441,9 @@ export default function Learn({ lessonId, onStart, onBack }: Props) {
   if (HOWTO[lessonId]) {
     cards.push(
       <Card title="怎么答题">
-        {LESSON_DEMOS[lessonId] && <HowToDemo demos={LESSON_DEMOS[lessonId]} />}
+        {lessonId === 3
+          ? <Lesson3IntroDemo active={page === 0} />
+          : LESSON_DEMOS[lessonId] && <HowToDemo demos={LESSON_DEMOS[lessonId]} />}
         <ol className="howtoList">
           {HOWTO[lessonId].map(s => <li key={s}>{s}</li>)}
         </ol>
@@ -457,7 +462,7 @@ export default function Learn({ lessonId, onStart, onBack }: Props) {
   return (
     <div className="learnPage">
       <button className="backLink" onClick={onBack}>‹ 返回地图</button>
-      <h2>第 {lesson.id} 课 · {lesson.title}</h2>
+      <h2 className={lessonId === 3 ? 'l3-learn-title' : undefined}>第 {lesson.id} 课 · {lesson.title}</h2>
       <p className="goal">{lesson.goal}</p>
       {total > 1 && (
         <div className="learnDots">

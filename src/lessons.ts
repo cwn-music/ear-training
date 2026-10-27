@@ -11,7 +11,7 @@ export const UNITS: Unit[] = [
 export const LESSONS: Lesson[] = [
   { id: 1, title: '声音有高低', goal: '不看谱、不记唱名，听出更高、相同、更低与声音走向，并愿意模仿' },
   { id: 2, title: '三个音有名字', goal: '记住 do、re、mi，听音选唱名、找琴键，并模仿三音短句' },
-  { id: 3, title: '声音的长短', goal: '听辨哪个音更长' },
+  { id: 3, title: '找到do、re、mi的谱面位置', goal: '把熟悉的声音和唱名，对应到高音谱表上的三个固定位置' },
   { id: 4, title: '声音的强弱', goal: '听辨哪个音更响' },
   { id: 5, title: '认识五线谱', goal: '高音谱号与 do 的位置' },
   { id: 6, title: '二度', goal: '相邻的音' },

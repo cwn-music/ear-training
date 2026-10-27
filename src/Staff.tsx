@@ -23,6 +23,7 @@ interface Props {
   midis?: number[] // 和弦/多音
   chord?: boolean
   rhythm?: Tok[]
+  noteDuration?: 'q' | 'w' // 单音/音组谱面外观；默认保持既有全音符，不改变其他课程
   width?: number
   height?: number
   // —— 摆音符模式：谱面上画发光候选圈，点击后由父组件热区接管 ——
@@ -68,7 +69,7 @@ function tokNotes(tok: Tok, midi: number): StaveNote[] {
   }
 }
 
-export default function Staff({ clef = 'treble', midi = null, midis, chord = false, rhythm, width = 320, height = 120, slots, placedMidi = null, revealMidi = null, wrongMidi = null, onSlots, noteX, staveY }: Props) {
+export default function Staff({ clef = 'treble', midi = null, midis, chord = false, rhythm, noteDuration = 'w', width = 320, height = 120, slots, placedMidi = null, revealMidi = null, wrongMidi = null, onSlots, noteX, staveY }: Props) {
   const ref = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -186,20 +187,20 @@ export default function Staff({ clef = 'treble', midi = null, midis, chord = fal
         notes = rhythm.flatMap(tok => tokNotes(tok, midi ?? 71))
       } else if (midis && midis.length > 0) {
         if (chord) {
-          const n = new StaveNote({ keys: midis.map(keyOf), duration: 'w', clef: clef === 'none' ? 'treble' : clef })
+          const n = new StaveNote({ keys: midis.map(keyOf), duration: noteDuration, clef: clef === 'none' ? 'treble' : clef })
           midis.forEach((m, i) => {
             if (needsAcc(m)) n.addModifier(new Accidental('#'), i)
           })
           notes = [n]
         } else {
           notes = midis.map(m => {
-            const n = new StaveNote({ keys: [keyOf(m)], duration: 'w', clef: clef === 'none' ? 'treble' : clef })
+            const n = new StaveNote({ keys: [keyOf(m)], duration: noteDuration, clef: clef === 'none' ? 'treble' : clef })
             if (needsAcc(m)) n.addModifier(new Accidental('#'), 0)
             return n
           })
         }
       } else if (midi !== null && noteX == null) {
-        const n = new StaveNote({ keys: [keyOf(midi)], duration: 'w', clef: clef === 'none' ? 'treble' : clef })
+        const n = new StaveNote({ keys: [keyOf(midi)], duration: noteDuration, clef: clef === 'none' ? 'treble' : clef })
         if (needsAcc(midi)) n.addModifier(new Accidental('#'), 0)
         notes = [n]
       }
@@ -239,7 +240,7 @@ export default function Staff({ clef = 'treble', midi = null, midis, chord = fal
       console.warn('Staff render failed:', e)
     }
     }
-  }, [clef, midi, midis, chord, rhythm, width, height, slots, placedMidi, revealMidi, wrongMidi, noteX])
+  }, [clef, midi, midis, chord, rhythm, noteDuration, width, height, slots, placedMidi, revealMidi, wrongMidi, noteX])
 
   return <div ref={ref} className="staffWrap" />
 }

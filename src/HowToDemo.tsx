@@ -2,7 +2,9 @@
 // 「怎么答题」卡里的循环小动画：用简笔界面元素演示完整答题动作——
 // 听/看题目 → 手指点答案 → 标绿打勾。6 秒一轮，纯 CSS 驱动。
 // 一课有多种新题型时（如第 5 课），轮播切换。
-import { useEffect, useState, type CSSProperties, type ReactNode } from 'react'
+import { useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
+import Staff from './Staff'
+import { playLesson1Sequence, stopLesson1Audio } from './lesson1Audio'
 
 export type DemoKind =
   | 'pitch' | 'sight' | 'place' | 'judge'
@@ -15,7 +17,6 @@ export type DemoKind =
 export const LESSON_DEMOS: Record<number, DemoKind[]> = {
   1: ['pitch'],
   2: ['pitchcmp', 'sing2', 'play2'],
-  3: ['durcmp', 'playalong'],
   4: ['dyncmp', 'dynote'],
   5: ['sight', 'place', 'judge'],
   6: ['interval'],
@@ -417,6 +418,342 @@ export default function HowToDemo({ demos }: { demos: DemoKind[] }) {
       <div className="dmStage" key={cur}>
         <DemoStage kind={cur} />
       </div>
+    </div>
+  )
+}
+
+// —— 第3课课首：声音、唱名、谱面三向对应的可操作演示 ——
+// 只用于 Learn 的课首说明，不参与第3课题目生成、作答判定或学习记录。
+type L3Pitch = 60 | 62 | 64
+type L3SceneId = 'listenName' | 'sightName' | 'listenPlace' | 'match'
+
+const L3_PITCHES: L3Pitch[] = [60, 62, 64]
+const L3_SOLFEGE: Record<L3Pitch, string> = { 60: 'do', 62: 're', 64: 'mi' }
+const L3_POSITION: Record<L3Pitch, string> = { 60: '下加一线', 62: '下加一间', 64: '第一线' }
+
+interface L3Scene {
+  id: L3SceneId
+  label: string
+  pitch: L3Pitch
+  steps: string[]
+  soundSteps: number[]
+}
+
+const L3_SCENES: L3Scene[] = [
+  {
+    id: 'listenName', label: '听音选名', pitch: 62, soundSteps: [0, 2],
+    steps: [
+      '先听一个音，记住它的声音。',
+      '再在 do、re、mi 中点它的名字。',
+      '答后会再听一次，并看到对应的琴键。',
+    ],
+  },
+  {
+    id: 'sightName', label: '看谱选名', pitch: 62, soundSteps: [2],
+    steps: [
+      '先看音符在谱面上的位置。',
+      '说出它的名字，再点对应选项。',
+      '答后可以点听，把位置、名字和声音连起来。',
+    ],
+  },
+  {
+    id: 'listenPlace', label: '听音定位', pitch: 62, soundSteps: [0, 2],
+    steps: [
+      '先听声音，看看三个可以摆放的位置。',
+      '点一下待放音符，再点它的谱面位置；也可以拖动。',
+      '音符落到下加一间，再听一次这个位置的声音。',
+    ],
+  },
+  {
+    id: 'match', label: '三向配对', pitch: 62, soundSteps: [0, 3],
+    steps: [
+      '先点一张声音卡，听一听。',
+      '再点与它相同的唱名。',
+      '最后点对应的谱面位置。',
+      '同一个声音的三个朋友，连成一组。',
+    ],
+  },
+]
+
+function useLesson3Sound(active: boolean) {
+  const [sounding, setSounding] = useState(false)
+  const [audioError, setAudioError] = useState(false)
+  const requestRef = useRef(0)
+
+  const stopSound = useCallback(() => {
+    requestRef.current += 1
+    stopLesson1Audio()
+    setSounding(false)
+    setAudioError(false)
+  }, [])
+
+  const playSound = useCallback((pitch: L3Pitch) => {
+    const request = ++requestRef.current
+    setSounding(true)
+    setAudioError(false)
+    void playLesson1Sequence([pitch], { noteMs: 650, gapMs: 0 })
+      .catch(() => {
+        if (request === requestRef.current) setAudioError(true)
+      })
+      .finally(() => {
+        if (request === requestRef.current) setSounding(false)
+      })
+  }, [])
+
+  useEffect(() => {
+    if (!active) stopSound()
+  }, [active, stopSound])
+
+  useEffect(() => () => {
+    requestRef.current += 1
+    stopLesson1Audio()
+  }, [])
+
+  return { sounding, audioError, playSound, stopSound }
+}
+
+function L3SoundIcon({ active = false }: { active?: boolean }) {
+  return (
+    <span className={'l3-sound-icon' + (active ? ' sounding' : '')} aria-hidden="true">
+      <svg viewBox="0 0 36 28">
+        <path className="l3-speaker" d="M3 10h6l8-7v22l-8-7H3z" />
+        <path className="l3-wave one" d="M22 9c3 3 3 7 0 10" />
+        <path className="l3-wave two" d="M26 5c6 6 6 12 0 18" />
+      </svg>
+    </span>
+  )
+}
+
+function L3TapPointer({ x, y, show }: { x: string; y: string; show: boolean }) {
+  return (
+    <span className={'l3-tap-pointer' + (show ? ' show' : '')} style={{ left: x, top: y }} aria-hidden="true">
+      <i />
+      <svg viewBox="0 0 28 32"><path d="M5 3l16 14-8 1 5 8-5 3-5-9-6 6z" /></svg>
+    </span>
+  )
+}
+
+function L3Options({ reveal }: { reveal: boolean }) {
+  return (
+    <div className="l3-demo-options">
+      {L3_PITCHES.map(pitch => (
+        <span key={pitch} className={'l3-demo-option' + (reveal && pitch === 62 ? ' correct' : '')}>
+          {L3_SOLFEGE[pitch]}
+          {reveal && pitch === 62 && <b aria-hidden="true">✓</b>}
+        </span>
+      ))}
+    </div>
+  )
+}
+
+function L3MiniKeys({ reveal }: { reveal: boolean }) {
+  return (
+    <span className="l3-mini-keys" aria-hidden="true">
+      {L3_PITCHES.map(pitch => (
+        <span key={pitch} className={reveal && pitch === 62 ? 'correct' : ''}>{L3_SOLFEGE[pitch]}</span>
+      ))}
+    </span>
+  )
+}
+
+function L3MatchGrid({ step, sounding }: { step: number; sounding: boolean }) {
+  const nameOrder: L3Pitch[] = [64, 62, 60]
+  const staffOrder: L3Pitch[] = [64, 60, 62]
+  const complete = step === 3
+  return (
+    <div className="l3-match-grid">
+      <svg className="l3-match-lines" viewBox="0 0 300 280" preserveAspectRatio="none" aria-hidden="true">
+        <path className={step >= 2 ? 'show' : ''} d="M91 66 C112 66 101 153 108 153" />
+        <path className={complete ? 'show' : ''} d="M197 153 C216 153 201 240 209 240" />
+      </svg>
+      <div className="l3-match-head">声音</div>
+      <div className="l3-match-head">唱名</div>
+      <div className="l3-match-head">谱面</div>
+      {[0, 1, 2].flatMap(row => [
+        <div key={`sound-${row}`} className={'l3-match-card sound' + (row === 0 ? complete ? ' correct' : ' current' : '')}>
+          <L3SoundIcon active={sounding && row === 0} />
+          <span>声音 {'ABC'[row]}</span>
+        </div>,
+        <div key={`name-${row}`} className={'l3-match-card name' + (nameOrder[row] === 62 && step >= 1 ? complete ? ' correct' : ' current' : '')}>
+          {L3_SOLFEGE[nameOrder[row]]}
+        </div>,
+        <div key={`staff-${row}`} className={'l3-match-card staff' + (staffOrder[row] === 62 && step >= 2 ? complete ? ' correct' : ' current' : '')}>
+          <Staff midi={staffOrder[row]} noteDuration="q" width={82} height={80} staveY={-20} />
+        </div>,
+      ])}
+      <L3TapPointer x="16%" y="24%" show={step === 0} />
+      <L3TapPointer x="50%" y="55%" show={step === 1} />
+      <L3TapPointer x="84%" y="86%" show={step === 2} />
+    </div>
+  )
+}
+
+function L3DemoScene({ scene, step, sounding }: { scene: L3Scene; step: number; sounding: boolean }) {
+  const complete = step === scene.steps.length - 1
+  if (scene.id === 'listenName') {
+    return (
+      <div className="l3-scene-inner">
+        <div className="l3-listen-top">
+          <span className="l3-sound-card"><L3SoundIcon active={sounding} /><span>{sounding ? '正在听' : '听一个音'}</span></span>
+          <L3MiniKeys reveal={complete} />
+        </div>
+        <L3Options reveal={complete} />
+        <L3TapPointer x="50%" y="82%" show={step === 1} />
+      </div>
+    )
+  }
+  if (scene.id === 'sightName') {
+    return (
+      <div className="l3-scene-inner">
+        <div className={'l3-demo-staff-single' + (complete ? ' correct' : '')}>
+          <Staff midi={62} noteDuration="q" width={280} height={126} />
+          {complete && <span className="l3-staff-answer">re · 下加一间</span>}
+        </div>
+        <L3Options reveal={complete} />
+        <L3TapPointer x="50%" y="82%" show={step === 1} />
+      </div>
+    )
+  }
+  if (scene.id === 'listenPlace') {
+    return (
+      <div className="l3-scene-inner place">
+        <span className="l3-place-sound"><L3SoundIcon active={sounding} />{sounding ? '正在听' : '先听声音'}</span>
+        <span className={'l3-waiting-note' + (complete ? ' placed' : '')}><i />待放音符</span>
+        <div className="l3-demo-staff-place">
+          <Staff
+            slots={L3_PITCHES}
+            placedMidi={complete ? 62 : null}
+            revealMidi={complete ? 62 : null}
+            width={280}
+            height={150}
+          />
+        </div>
+        <span className="l3-place-tip">点按或拖动，都可以</span>
+        <L3TapPointer x="57%" y="55%" show={step === 1} />
+      </div>
+    )
+  }
+  return <L3MatchGrid step={step} sounding={sounding} />
+}
+
+export function Lesson3IntroDemo({ active = true }: { active?: boolean }) {
+  const [sceneId, setSceneId] = useState<L3SceneId>('listenName')
+  const [step, setStep] = useState(0)
+  const [playing, setPlaying] = useState(false)
+  const scene = L3_SCENES.find(item => item.id === sceneId) ?? L3_SCENES[0]
+  const last = scene.steps.length - 1
+  const { sounding, audioError, playSound, stopSound } = useLesson3Sound(active)
+
+  useEffect(() => {
+    if (!playing || !active) return
+    const timer = window.setTimeout(() => {
+      const next = Math.min(step + 1, last)
+      setStep(next)
+      if (next === last) setPlaying(false)
+      if (scene.soundSteps.includes(next)) playSound(scene.pitch)
+      else stopSound()
+    }, 1900)
+    return () => window.clearTimeout(timer)
+  }, [active, last, playSound, playing, scene, step, stopSound])
+
+  const selectScene = (next: L3SceneId) => {
+    stopSound()
+    setPlaying(false)
+    setSceneId(next)
+    setStep(0)
+  }
+
+  const togglePlaying = () => {
+    if (playing) {
+      setPlaying(false)
+      stopSound()
+      return
+    }
+    const startAt = step === last ? 0 : step
+    setStep(startAt)
+    setPlaying(true)
+    if (scene.soundSteps.includes(startAt)) playSound(scene.pitch)
+    else stopSound()
+  }
+
+  const goToStep = (next: number) => {
+    const bounded = Math.max(0, Math.min(last, next))
+    setPlaying(false)
+    setStep(bounded)
+    if (scene.soundSteps.includes(bounded)) playSound(scene.pitch)
+    else stopSound()
+  }
+
+  return (
+    <section className="l3-demo" aria-label="第3课做题示范">
+      <div className="l3-demo-heading">
+        <span>做题示范</span>
+        <p>选一种题，跟着分步演示看一遍。</p>
+      </div>
+      <div className="l3-demo-tabs" aria-label="选择示范类型">
+        {L3_SCENES.map(item => (
+          <button
+            key={item.id}
+            type="button"
+            className={item.id === sceneId ? 'now' : ''}
+            aria-pressed={item.id === sceneId}
+            onClick={() => selectScene(item.id)}
+          >
+            {item.label}
+          </button>
+        ))}
+      </div>
+      <div className="l3-demo-stage" data-l3-scene={scene.id} data-l3-step={step} data-playing={playing}>
+        <div className="l3-demo-step-copy">
+          <span>第 {step + 1} / {scene.steps.length} 步</span>
+          <p aria-live="polite">{scene.steps[step]}</p>
+        </div>
+        <div className="l3-demo-scene" aria-hidden="true">
+          <L3DemoScene scene={scene} step={step} sounding={sounding} />
+        </div>
+      </div>
+      <div className="l3-demo-controls">
+        <button type="button" className="ghost" disabled={step === 0} onClick={() => goToStep(step - 1)}>上一步</button>
+        <button type="button" className="primary" onClick={togglePlaying}>
+          {playing ? '暂停示范' : step === last ? '再演示一次' : step > 0 ? '继续示范' : '播放示范'}
+        </button>
+        <button type="button" className="ghost" disabled={step === last} onClick={() => goToStep(step + 1)}>下一步</button>
+      </div>
+      {audioError && <p className="l3-audio-error" role="alert">声音暂时没有加载好，请再点一次播放。</p>}
+    </section>
+  )
+}
+
+export function Lesson3StaffHomes({ active = true }: { active?: boolean }) {
+  const [current, setCurrent] = useState<L3Pitch | null>(null)
+  const { sounding, audioError, playSound } = useLesson3Sound(active)
+  return (
+    <div className="l3-homes">
+      <div className="l3-home-list">
+        {L3_PITCHES.map(pitch => (
+          <button
+            key={pitch}
+            type="button"
+            className={'l3-home-row' + (current === pitch ? ' now' : '')}
+            aria-label={`听 ${L3_SOLFEGE[pitch]}，${L3_POSITION[pitch]}`}
+            onClick={() => { setCurrent(pitch); playSound(pitch) }}
+          >
+            <span className="l3-home-copy">
+              <strong>{L3_SOLFEGE[pitch]}</strong>
+              <small>{L3_POSITION[pitch]}</small>
+            </span>
+            <span className="l3-home-staff" aria-hidden="true">
+              <Staff midi={pitch} noteDuration="q" width={180} height={112} staveY={0} />
+            </span>
+          </button>
+        ))}
+      </div>
+      <p className="l3-home-feedback" aria-live="polite">
+        {current === null
+          ? '从下到上：do、re、mi。'
+          : `${L3_SOLFEGE[current]} 住在${L3_POSITION[current]}${sounding && current !== null ? '，正在听它的声音。' : '。'}`}
+      </p>
+      {audioError && <p className="l3-audio-error" role="alert">声音暂时没有加载好，请再点一次。</p>}
     </div>
   )
 }
