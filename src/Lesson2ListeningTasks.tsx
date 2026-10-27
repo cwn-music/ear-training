@@ -200,6 +200,7 @@ export function ListenNameTask({ items, replayNonce, onDone }: TaskProps & { ite
   const [usedReference, setUsedReference] = useState(false)
   const [activePitch, setActivePitch] = useState<number | null>(null)
   const [audioError, setAudioError] = useState(false)
+  const [playingHint, setPlayingHint] = useState<string | null>(null)
   const recordsRef = useRef<L2NameRecord[]>([])
   const replayCountRef = useRef(0)
   const itemStartedAtRef = useRef(Date.now())
@@ -208,16 +209,25 @@ export function ListenNameTask({ items, replayNonce, onDone }: TaskProps & { ite
   statusRef.current = status
   const current = items[itemIndex]
 
-  const playSequence = useCallback(async (notes: number[], after: 'awaitingAnswer' | 'feedbackCorrect', manual: boolean) => {
+  const playSequence = useCallback(async (
+    notes: number[],
+    after: 'awaitingAnswer' | 'feedbackCorrect',
+    manual: boolean,
+    noteHints?: string[],
+  ) => {
     if (manual) replayCountRef.current += 1
     setStatus('playing')
     setAudioError(false)
     setActivePitch(null)
+    setPlayingHint(null)
     try {
       const completed = await playLesson1Sequence(notes, {
         noteMs: 650,
         gapMs: 300,
-        onNote: index => setActivePitch(notes[index]),
+        onNote: index => {
+          setActivePitch(notes[index])
+          setPlayingHint(noteHints?.[index] ?? null)
+        },
       })
       if (completed) setStatus(after)
     } catch {
@@ -225,6 +235,7 @@ export function ListenNameTask({ items, replayNonce, onDone }: TaskProps & { ite
       setStatus(after)
     } finally {
       setActivePitch(null)
+      setPlayingHint(null)
     }
   }, [])
 
@@ -254,7 +265,12 @@ export function ListenNameTask({ items, replayNonce, onDone }: TaskProps & { ite
   const playReference = async () => {
     if (status === 'playing') return
     setUsedReference(true)
-    await playSequence([60, current.pitch], status === 'feedbackCorrect' ? 'feedbackCorrect' : 'awaitingAnswer', true)
+    await playSequence(
+      [60, current.pitch],
+      status === 'feedbackCorrect' ? 'feedbackCorrect' : 'awaitingAnswer',
+      true,
+      ['先听熟悉的 do', '再听题目音，猜猜它的名字'],
+    )
   }
 
   const answer = async (optionId: string) => {
@@ -320,6 +336,7 @@ export function ListenNameTask({ items, replayNonce, onDone }: TaskProps & { ite
       <p className="l1-guide">只听声音，先不看琴键答案。</p>
       <p className="l1-item-count">本任务第 {itemIndex + 1} / {items.length} 题</p>
       <div className={'l2-play-orbit single' + (activePitch !== null ? ' playing' : '')} aria-hidden="true"><L2SoundIcon /></div>
+      {playingHint && <p className="l1-small-hint" aria-live="polite">{playingHint}</p>}
       {showAnswer && (
         <div className="l2-answer-key">
           <strong>{current.answerSolfege}</strong>
@@ -337,14 +354,14 @@ export function ListenNameTask({ items, replayNonce, onDone }: TaskProps & { ite
         ))}
       </div>
       {status === 'feedbackCorrect' && <p className="l1-feedback correct">这个声音叫 {current.answerSolfege}，对应高亮的琴键。</p>}
-      {status === 'feedbackRetry' && <p className="l1-feedback retry">先听 do 作参照，再听这个音；正确对应已经显示，再试一次。</p>}
+      {status === 'feedbackRetry' && <p className="l1-feedback retry">可以先听熟悉的 do，再听题目音。跟着这两个声音，再选一次。</p>}
       {audioError && <p className="l1-feedback retry" role="alert">声音没有加载好，请再听一次。</p>}
       <div className="l1-task-actions wrap">
         <button className="btn ghost" disabled={status === 'playing'} onClick={() => {
           if (status === 'feedbackCorrect') void replayCorrect()
           else void playForAnswer(true)
         }}>再听一次</button>
-        <button className="btn ghost" disabled={status === 'playing'} onClick={() => void playReference()}>听参照音后重听</button>
+        <button className="btn ghost" disabled={status === 'playing'} onClick={() => void playReference()}>先听 do，再听题目音</button>
         {status === 'feedbackCorrect' && <button className="btn primary" onClick={next}>{itemIndex + 1 < items.length ? '下一题' : '完成这个任务'}</button>}
       </div>
     </section>
@@ -375,7 +392,7 @@ export function FindKeyTask({ items, replayNonce, onDone }: TaskProps & { items:
     setStatus('playing')
     setAudioError(false)
     try {
-      const completed = await playLesson1Sequence([current.pitch], { noteMs: 650, gapMs: 300, onNote: () => setActivePitch(current.pitch) })
+      const completed = await playLesson1Sequence([current.pitch], { noteMs: 650, gapMs: 300 })
       if (completed) setStatus(after)
     } catch {
       setAudioError(true)
@@ -457,8 +474,14 @@ export function FindKeyTask({ items, replayNonce, onDone }: TaskProps & { items:
   const next = () => {
     if (status !== 'feedbackCorrect') return
     stopLesson1Audio()
-    if (itemIndex + 1 < items.length) setItemIndex(itemIndex + 1)
-    else onDone({ taskId: 'L02T07', items: recordsRef.current, completed: true })
+    if (itemIndex + 1 < items.length) {
+      // 切题时同步清除上一题状态，避免新题首帧短暂继承答案高亮。
+      setStatus('playing')
+      setShowHint(false)
+      setWrongPitch(null)
+      setActivePitch(null)
+      setItemIndex(itemIndex + 1)
+    } else onDone({ taskId: 'L02T07', items: recordsRef.current, completed: true })
   }
 
   return (
@@ -475,8 +498,8 @@ export function FindKeyTask({ items, replayNonce, onDone }: TaskProps & { items:
         onPick={pitch => void answer(pitch)}
       />
       {status === 'feedbackCorrect' && <p className="l1-feedback correct">找到了，这是 {current.answerSolfege} 的琴键。</p>}
-      {status === 'feedbackRetry' && <p className="l1-feedback retry">先听你点的音，再听目标音。唱名提示：目标是 {current.answerSolfege}。</p>}
-      {showHint && status === 'awaitingAnswer' && <p className="l1-small-hint">唱名提示：目标是 {current.answerSolfege}，再点一次它的琴键。</p>}
+      {status === 'feedbackRetry' && <p className="l1-feedback retry">先听你点的音，再听目标音。这个声音叫 {current.answerSolfege}。</p>}
+      {showHint && status === 'awaitingAnswer' && <p className="l1-small-hint">这个声音叫 {current.answerSolfege}，请点对应的琴键。</p>}
       {audioError && <p className="l1-feedback retry" role="alert">声音没有加载好，请再听一次。</p>}
       <div className="l1-task-actions wrap">
         <button className="btn ghost" disabled={status === 'playing'} onClick={() => void playTarget(true, status === 'feedbackCorrect' ? 'feedbackCorrect' : 'awaitingAnswer')}>再听一次</button>
@@ -484,7 +507,7 @@ export function FindKeyTask({ items, replayNonce, onDone }: TaskProps & { items:
           setUsedSolfegeHint(true)
           setShowHint(true)
           void playTarget(true, status === 'feedbackCorrect' ? 'feedbackCorrect' : 'awaitingAnswer')
-        }}>听唱名提示</button>
+        }}>看名字，再听一次</button>
         {status === 'feedbackCorrect' && <button className="btn primary" onClick={next}>{itemIndex + 1 < items.length ? '下一题' : '完成这个任务'}</button>}
       </div>
     </section>

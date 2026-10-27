@@ -78,7 +78,7 @@ export default function Lesson2EchoTask({ phrases, replayNonce, onDone }: Props)
       replayNonce={replayNonce}
       showSolfege
       demoLabel={targets.length === 3 ? '再听完整短句' : '再听这两个音'}
-      recordLabel={targets.length === 3 ? '按住唱完整短句' : '按住唱这两个音'}
+      recordLabel={targets.length === 3 ? '开始唱完整短句' : '开始唱这两个音'}
       continueLabel={continueLabel}
       onDemoNote={setActivePitch}
       onContinue={onContinue}

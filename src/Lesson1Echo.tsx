@@ -67,10 +67,16 @@ interface PitchMonitor {
 const midiOfFreq = (frequency: number) => 69 + 12 * Math.log2(frequency / 440)
 const octaveFoldedDiff = (midi: number, target: number) => (((midi - target) % 12) + 18) % 12 - 6
 
-function LivePitchIndicator({ midi, target }: { midi: number | null; target: number }) {
-  const offset = midi === null ? null : midi - target
-  const clampedOffset = offset === null ? 0 : Math.max(-6, Math.min(6, offset))
-  const position = (clampedOffset + 6) / 12 * 100
+function LivePitchIndicator({ midi, target, scaleNotes }: { midi: number | null; target: number; scaleNotes: number[] }) {
+  // 一条短句使用同一固定音高范围，目标线随当前音上下移动；单音与全同音仍居中。
+  const hasMelodicRange = new Set(scaleNotes).size > 1
+  const scaleMin = hasMelodicRange ? Math.min(...scaleNotes) - 2 : target - 6
+  const scaleMax = hasMelodicRange ? Math.max(...scaleNotes) + 2 : target + 6
+  const offset = midi === null ? null : hasMelodicRange ? octaveFoldedDiff(midi, target) : midi - target
+  const displayMidi = midi === null || offset === null ? null : target + offset
+  const toPosition = (pitch: number) => Math.max(0, Math.min(100, (pitch - scaleMin) / (scaleMax - scaleMin) * 100))
+  const position = displayMidi === null ? 50 : toPosition(displayMidi)
+  const targetTop = 100 - toPosition(target)
   const near = midi !== null && Math.abs(octaveFoldedDiff(midi, target)) <= 0.75
   const direction = midi === null
     ? '等待你的声音'
@@ -86,12 +92,12 @@ function LivePitchIndicator({ midi, target }: { midi: number | null; target: num
         <span className="l1-pitch-level high">高</span>
         <span className="l1-pitch-level low">低</span>
         <div className="l1-live-pitch-track" aria-hidden="true">
-          <span className="l1-pitch-target-line" />
+          <span className="l1-pitch-target-line" style={{ top: `${targetTop}%` }} />
           {midi === null
             ? <span className="l1-live-pitch-placeholder">等待你的声音</span>
             : <span className={'l1-live-pitch-bar' + (near ? ' near' : '')} style={{ bottom: `${position}%` }} />}
         </div>
-        <span className="l1-pitch-target-label" aria-hidden="true">目标</span>
+        <span className="l1-pitch-target-label" aria-hidden="true" style={{ top: `${targetTop}%` }}>目标</span>
       </div>
       <p className="l1-live-pitch-tip">光条跟着你的声音高低移动，变绿表示对准。</p>
     </div>
@@ -101,6 +107,12 @@ function LivePitchIndicator({ midi, target }: { midi: number | null; target: num
 const notAssessed = (totalNotes: number): PitchAssessment => ({
   status: 'notAssessed', matchedNotes: 0, totalNotes, heardMidi: null,
 })
+
+function storedPitchAssessment(assessment: PitchAssessment): Omit<PitchAssessment, 'heardMidi'> {
+  // 即时音高只用于本次判断，不进入本地长期学习记录。
+  const { heardMidi: _heardMidi, ...storedAssessment } = assessment
+  return storedAssessment
+}
 
 // 与旧版 Sing / SingGroup 一致：八度折叠、0.75 半音容差、连续稳定帧才算对准。
 // 不显示音名、频率、曲线或五线谱；只用高低光条提供实时位置反馈。
@@ -340,7 +352,7 @@ export default function Lesson1Echo({ taskId, materials, replayNonce, onDone }: 
   const [recording, setRecording] = useState(false)
   const [preparing, setPreparing] = useState(false)
   const [demoPlaying, setDemoPlaying] = useState(false)
-  const [message, setMessage] = useState('先听示范，再按住按钮唱回去。')
+  const [message, setMessage] = useState('先听示范，再点按钮唱回去。')
   const [micMessage, setMicMessage] = useState<string | null>(null)
 
   const recorderRef = useRef<MediaRecorder | null>(null)
@@ -355,6 +367,8 @@ export default function Lesson1Echo({ taskId, materials, replayNonce, onDone }: 
   const recordedAudioRef = useRef<HTMLAudioElement | null>(null)
   const demoRequestRef = useRef(0)
   const recordingStateRef = useRef(false)
+  const discardRecordingRef = useRef(false)
+  const demoStartingRef = useRef(false)
   const mountedRef = useRef(true)
   const startedAtRef = useRef(Date.now())
 
@@ -442,13 +456,34 @@ export default function Lesson1Echo({ taskId, materials, replayNonce, onDone }: 
     if (recorder?.state === 'recording') recorder.stop()
   }
 
+  const discardRecordingForDemo = async () => {
+    if (!recordingStateRef.current) return
+    // 这次尝试由学习者主动放弃：先停音高分析与录音，且不要保存成一次不清晰的结果。
+    discardRecordingRef.current = true
+    stopRequestedRef.current = true
+    cancelPitchMonitor()
+    const recorder = recorderRef.current
+    if (!recorder) {
+      stopRecording()
+      return
+    }
+    await new Promise<void>(resolve => {
+      const handleStop = recorder.onstop
+      recorder.onstop = event => {
+        try { handleStop?.call(recorder, event) } finally { resolve() }
+      }
+      if (recorder.state === 'recording') stopRecording()
+    })
+  }
+
   const beginRecording = async () => {
-    if (recordingStateRef.current || preparingRef.current || demoPlaying) return
+    if (recordingStateRef.current || preparingRef.current || demoPlaying || demoStartingRef.current) return
     const isRetry = currentAssessment !== null || audioUrlRef.current !== null
     stopLesson1Audio()
     clearLocalRecording()
     clearPitchAssessment()
     chunksRef.current = []
+    discardRecordingRef.current = false
     stopRequestedRef.current = false
     preparingRef.current = true
     setPreparing(true)
@@ -488,13 +523,15 @@ export default function Lesson1Echo({ taskId, materials, replayNonce, onDone }: 
         setMessage('录音没有成功，不会影响本课完成。')
       }
       recorder.onstop = () => {
-        const blob = new Blob(chunksRef.current, { type: recorder.mimeType || 'audio/webm' })
-        const assessment = finishPitchMonitor() ?? {
+        const discard = discardRecordingRef.current
+        const blob = discard ? null : new Blob(chunksRef.current, { type: recorder.mimeType || 'audio/webm' })
+        const assessment = discard ? null : finishPitchMonitor() ?? {
           status: 'unavailable' as const,
           matchedNotes: 0,
           totalNotes: currentNotes.length,
           heardMidi: null,
         }
+        chunksRef.current = []
         recordingStateRef.current = false
         preparingRef.current = false
         if (recorderRef.current === recorder) recorderRef.current = null
@@ -503,13 +540,20 @@ export default function Lesson1Echo({ taskId, materials, replayNonce, onDone }: 
           maxTimerRef.current = null
         }
         stopTracks()
+        discardRecordingRef.current = false
         if (!mountedRef.current || recorderFailed) return
         setRecording(false)
         setPreparing(false)
-        if (blob.size > 0) updateLocalAudioUrl(URL.createObjectURL(blob))
-        setAssessments(previous => ({ ...previous, [currentKey]: assessment }))
+        if (discard) {
+          setLiveMatchedNotes(0)
+          setLiveMidi(null)
+          setWaitingForRepeatedNote(false)
+          return
+        }
+        if (blob && blob.size > 0) updateLocalAudioUrl(URL.createObjectURL(blob))
+        if (assessment) setAssessments(previous => ({ ...previous, [currentKey]: assessment }))
         markParticipated(true, 'granted')
-        setMessage(blob.size > 0 ? '唱完了，可以再听一次。' : '已经完成一次模仿，也可以再试一次。')
+        setMessage(blob && blob.size > 0 ? '唱完了，可以再听一次。' : '已经完成一次模仿，也可以再试一次。')
       }
       try {
         pitchMonitorRef.current = createPitchMonitor(
@@ -541,9 +585,9 @@ export default function Lesson1Echo({ taskId, materials, replayNonce, onDone }: 
       preparingRef.current = false
       setRecording(true)
       setPreparing(false)
-      setMessage(`正在录音，松开结束；最长 ${isPhrase ? 8 : 5} 秒。`)
+      setMessage(`正在录音，唱完后点“唱完了”结束；最长 ${isPhrase ? 8 : 5} 秒。`)
       maxTimerRef.current = setTimeout(stopRecording, maxRecordingMs)
-      // 权限弹窗期间已经松开：取得录音器后马上收尾，不让界面卡在准备状态。
+      // 若权限等待期间页面隐藏并已请求停止，取得录音器后马上收尾。
       if (stopRequestedRef.current) stopRecording()
     } catch (error) {
       cancelPitchMonitor()
@@ -565,7 +609,9 @@ export default function Lesson1Echo({ taskId, materials, replayNonce, onDone }: 
   }
 
   const playDemo = async () => {
-    if (recordingStateRef.current || preparingRef.current) return
+    if (preparingRef.current || demoPlaying || demoStartingRef.current) return
+    demoStartingRef.current = true
+    const wasRecording = recordingStateRef.current
     stopLesson1Audio()
     if (recordedAudioRef.current) {
       recordedAudioRef.current.pause()
@@ -573,12 +619,16 @@ export default function Lesson1Echo({ taskId, materials, replayNonce, onDone }: 
     }
     const request = ++demoRequestRef.current
     setDemoPlaying(true)
-    setMessage('听完整示范，再模仿。')
+    setMessage(wasRecording ? '先停下这次录音，再听示范。' : '听完整示范，再模仿。')
     try {
+      if (wasRecording) await discardRecordingForDemo()
+      if (!mountedRef.current || request !== demoRequestRef.current) return
+      setMessage('听完整示范，再模仿。')
       await playLesson1Sequence(currentNotes, { noteMs: 700, gapMs: 300 })
     } catch {
       if (request === demoRequestRef.current) setMicMessage('声音没有加载好，请点“听示范”重试。')
     } finally {
+      demoStartingRef.current = false
       if (request === demoRequestRef.current && mountedRef.current) setDemoPlaying(false)
     }
   }
@@ -618,7 +668,7 @@ export default function Lesson1Echo({ taskId, materials, replayNonce, onDone }: 
           rounds: singleRounds.map((notes, index) => ({
             pitch: notes[0],
             ...(participation[`single-${index}`] ?? DEFAULT_PARTICIPATION),
-            pitchAssessment: assessments[`single-${index}`] ?? notAssessed(1),
+            pitchAssessment: storedPitchAssessment(assessments[`single-${index}`] ?? notAssessed(1)),
             retryCount: retryCounts[`single-${index}`] ?? 0,
           })),
           completed: true,
@@ -639,7 +689,7 @@ export default function Lesson1Echo({ taskId, materials, replayNonce, onDone }: 
         taskId,
         sequence: fullPhrase,
         ...(participation.full ?? DEFAULT_PARTICIPATION),
-        pitchAssessment: assessments.full ?? notAssessed(fullPhrase.length),
+        pitchAssessment: storedPitchAssessment(assessments.full ?? notAssessed(fullPhrase.length)),
         usedSegmentSupport,
         retryCount: retryCounts.full ?? 0,
         completed: true,
@@ -732,6 +782,7 @@ export default function Lesson1Echo({ taskId, materials, replayNonce, onDone }: 
         <LivePitchIndicator
           midi={liveMidi}
           target={livePitchTarget}
+          scaleNotes={currentNotes}
         />
       )}
       {recording && (
@@ -740,7 +791,7 @@ export default function Lesson1Echo({ taskId, materials, replayNonce, onDone }: 
             ? `第 ${liveMatchedNotes} 个音已对准。稍停一下，再单独唱下一个同音。`
             : liveMatchedNotes > 0
               ? currentNotes.length === 1
-                ? '这个音已经对准，可以保持到松开。'
+                ? '这个音已经对准，可以点“唱完了”结束。'
                 : `已按顺序对准 ${liveMatchedNotes} / ${currentNotes.length} 个音。`
               : '正在这台设备上判断音高…'}
         </p>
@@ -754,32 +805,22 @@ export default function Lesson1Echo({ taskId, materials, replayNonce, onDone }: 
       {isPhrase && group !== null && <p className="l1-support-label">分组练 · 第 {group + 1} 组</p>}
 
       <div className="l1-echo-actions">
-        <button className="btn ghost" onClick={() => void playDemo()} disabled={demoPlaying || recording || preparing}>
-          {demoPlaying ? '正在播放…' : isPhrase ? '听示范' : '再听示范'}
+        <button className="btn ghost" onClick={() => void playDemo()} disabled={demoPlaying || preparing}>
+          {demoPlaying
+            ? recording ? '正在停下…' : '正在播放…'
+            : recording ? '停下听示范' : isPhrase ? '听示范' : '再听示范'}
         </button>
         <button
           className={currentParticipation.participated ? 'btn ghost l1-record-button' : 'btn primary l1-record-button'}
-          disabled={demoPlaying}
+          disabled={demoPlaying || preparing}
           aria-pressed={recording}
-          onPointerDown={event => {
-            event.currentTarget.setPointerCapture(event.pointerId)
-            void beginRecording()
-          }}
-          onPointerUp={stopRecording}
-          onPointerCancel={stopRecording}
-          onLostPointerCapture={stopRecording}
-          onKeyDown={event => {
-            if ((event.key === ' ' || event.key === 'Enter') && !event.repeat) {
-              event.preventDefault()
-              void beginRecording()
-            }
-          }}
-          onKeyUp={event => {
-            if (event.key === ' ' || event.key === 'Enter') stopRecording()
+          onClick={() => {
+            if (recordingStateRef.current) stopRecording()
+            else void beginRecording()
           }}
         >
           <MicIcon />
-          {recording ? '松开结束' : preparing ? '准备中…' : '按住唱回去'}
+          {recording ? '唱完了' : preparing ? '准备中…' : '开始唱回去'}
         </button>
         {audioUrl && <button className="btn ghost" onClick={playMyRecording} disabled={recording || preparing}>听我的录音</button>}
       </div>

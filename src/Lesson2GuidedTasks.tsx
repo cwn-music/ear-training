@@ -62,7 +62,7 @@ export function RememberLowTask({ replayNonce, onDone }: TaskProps) {
           targets={[60]}
           replayNonce={replayNonce}
           demoLabel="再听声音A"
-          recordLabel="按住模仿"
+          recordLabel="开始模仿"
           continueLabel="完成这一轮"
           onContinue={finishRound}
         />
@@ -183,7 +183,7 @@ export function RememberMiddleTask({ replayNonce, onDone }: TaskProps) {
           targets={[62]}
           replayNonce={replayNonce}
           demoLabel="再听声音B"
-          recordLabel="按住模仿"
+          recordLabel="开始模仿"
           continueLabel="和声音A比一比"
           onContinue={result => {
             setVoiceResult(result)
@@ -319,7 +319,7 @@ export function OrderThreeTask({ stepOrder, replayNonce, onDone }: TaskProps & {
           targets={[64]}
           replayNonce={replayNonce}
           demoLabel="再听新声音"
-          recordLabel="按住模仿"
+          recordLabel="开始模仿"
           continueLabel="开始排高低"
           onContinue={result => {
             setVoiceResult(result)

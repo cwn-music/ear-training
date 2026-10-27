@@ -308,8 +308,8 @@
 .l1-pitch-level { position: absolute; left: 8px; color: #786d58; font-size: 0.76rem; line-height: 1; }
 .l1-pitch-level.high { top: 8px; }
 .l1-pitch-level.low { bottom: 8px; }
-.l1-pitch-target-line { position: absolute; top: 50%; left: 0; right: 0; border-top: 1px dashed rgba(34, 48, 74, 0.42); }
-.l1-pitch-target-label { position: absolute; top: 50%; right: 6px; transform: translateY(-50%); color: #786d58; font-size: 0.72rem; }
+.l1-pitch-target-line { position: absolute; top: 50%; left: 0; right: 0; border-top: 1px dashed rgba(34, 48, 74, 0.42); transition: top 140ms ease-out; }
+.l1-pitch-target-label { position: absolute; top: 50%; right: 6px; transform: translateY(-50%); color: #786d58; font-size: 0.72rem; transition: top 140ms ease-out; }
 .l1-live-pitch-bar {
   position: absolute;
   left: 0;
