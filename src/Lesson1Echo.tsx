@@ -366,6 +366,14 @@ export default function Lesson1Echo({ taskId, materials, replayNonce, onDone }: 
   const currentParticipation = participation[currentKey] ?? DEFAULT_PARTICIPATION
   const currentAssessment = assessments[currentKey] ?? null
   const pitchFeedback = currentAssessment ? pitchFeedbackCopy(currentAssessment) : null
+  const nextLiveTarget = currentNotes[Math.min(liveMatchedNotes, currentNotes.length - 1)]
+  const lastMatchedTarget = liveMatchedNotes > 0 ? currentNotes[liveMatchedNotes - 1] : null
+  // 多音模唱唱准一音后，判定会马上前进到下一目标；仍保持刚唱准的音时，
+  // 光条继续对照该音并显示绿色，离开该音后才切换到下一目标。
+  const livePitchTarget = lastMatchedTarget !== null && liveMidi !== null
+    && Math.abs(octaveFoldedDiff(liveMidi, lastMatchedTarget)) <= 0.75
+    ? lastMatchedTarget
+    : nextLiveTarget
   const maxRecordingMs = isPhrase ? 8000 : 5000
 
   const stopTracks = () => {
@@ -436,6 +444,7 @@ export default function Lesson1Echo({ taskId, materials, replayNonce, onDone }: 
 
   const beginRecording = async () => {
     if (recordingStateRef.current || preparingRef.current || demoPlaying) return
+    const isRetry = currentAssessment !== null || audioUrlRef.current !== null
     stopLesson1Audio()
     clearLocalRecording()
     clearPitchAssessment()
@@ -525,6 +534,9 @@ export default function Lesson1Echo({ taskId, materials, replayNonce, onDone }: 
       // 若权限等待期间页面从后台恢复并重启了示范，录音前再次确保示范停止。
       stopLesson1Audio()
       recorder.start()
+      if (isRetry) {
+        setRetryCounts(previous => ({ ...previous, [currentKey]: (previous[currentKey] ?? 0) + 1 }))
+      }
       recordingStateRef.current = true
       preparingRef.current = false
       setRecording(true)
@@ -583,15 +595,6 @@ export default function Lesson1Echo({ taskId, materials, replayNonce, onDone }: 
       setMicMessage('本地录音暂时无法回放，可以再唱一次。')
     }
     void audio.play().catch(() => setMicMessage('点一次“听我的录音”即可回放。'))
-  }
-
-  const retry = () => {
-    if (recordingStateRef.current || preparingRef.current) return
-    clearLocalRecording()
-    clearPitchAssessment()
-    setRetryCounts(previous => ({ ...previous, [currentKey]: (previous[currentKey] ?? 0) + 1 }))
-    setMessage('再听一次示范，然后慢慢唱。')
-    void playDemo()
   }
 
   const selfReport = () => {
@@ -728,7 +731,7 @@ export default function Lesson1Echo({ taskId, materials, replayNonce, onDone }: 
       {recording && (
         <LivePitchIndicator
           midi={liveMidi}
-          target={currentNotes[Math.min(liveMatchedNotes, currentNotes.length - 1)]}
+          target={livePitchTarget}
         />
       )}
       {recording && (
@@ -779,7 +782,6 @@ export default function Lesson1Echo({ taskId, materials, replayNonce, onDone }: 
           {recording ? '松开结束' : preparing ? '准备中…' : '按住唱回去'}
         </button>
         {audioUrl && <button className="btn ghost" onClick={playMyRecording} disabled={recording || preparing}>听我的录音</button>}
-        <button className="btn ghost" onClick={retry} disabled={demoPlaying || recording || preparing}>{isPhrase ? '再唱一次' : '再试一次'}</button>
       </div>
 
       <div className="l1-echo-support">
