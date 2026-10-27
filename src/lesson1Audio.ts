@@ -15,6 +15,12 @@ function disposeInstruments() {
   flute = null
 }
 
+// 课程开始与示范播放已经通过用户操作解锁这个音频环境。
+// 麦克风音高分析复用它，避免在 getUserMedia 的异步授权之后新建一个可能被手机浏览器暂停的 AudioContext。
+export function getLesson1AudioContext(): AudioContext {
+  return Tone.getContext().rawContext as AudioContext
+}
+
 export async function prepareLesson1Audio(): Promise<void> {
   if (Tone.getContext().state !== 'running') await Tone.start()
   if (!ready) {

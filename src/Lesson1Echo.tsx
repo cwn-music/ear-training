@@ -1,7 +1,7 @@
 // 第1课任务7—8：本地录音与即时回放，并保留旧版的 Pitchy 音准判断与文字反馈。
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { PitchDetector } from 'pitchy'
-import { playLesson1Sequence, stopLesson1Audio } from './lesson1Audio'
+import { getLesson1AudioContext, playLesson1Sequence, stopLesson1Audio } from './lesson1Audio'
 import type { Lesson1EchoMaterials } from './lesson1Data'
 
 interface Props {
@@ -111,7 +111,7 @@ function createPitchMonitor(
   onHear: (midi: number | null) => void,
   onRepeatWait: (waiting: boolean) => void,
 ): PitchMonitor {
-  const context = new AudioContext()
+  const context = getLesson1AudioContext()
   const source = context.createMediaStreamSource(stream)
   const analyser = context.createAnalyser()
   analyser.fftSize = 2048
@@ -148,7 +148,7 @@ function createPitchMonitor(
     cancelAnimationFrame(raf)
     try { source.disconnect() } catch { /* 已断开 */ }
     try { analyser.disconnect() } catch { /* 已断开 */ }
-    void context.close().catch(() => undefined)
+    // 这是课程播放与分析共用的音频环境；只断开本次输入，不能关闭它。
   }
 
   const finish = () => {

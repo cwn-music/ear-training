@@ -1,0 +1,235 @@
+/* 第一单元第2课：仅补充新任务样式，复用第1课纸面组件，不改变封面、地图和其他课程。 */
+.lesson2Page .l2-intro-goal { max-width: 28em; margin: 0 auto 12px; color: #655e53; line-height: 1.8; }
+.lesson2Page .l2-conch { width: 76px; height: 76px; object-fit: contain; }
+
+.lesson2Page .l2-play-orbit {
+  min-height: 108px;
+  margin: 10px auto 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(22px, 8vw, 44px);
+  color: var(--slate);
+}
+.lesson2Page .l2-play-orbit > span {
+  width: 38px;
+  height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px dashed var(--slate);
+  border-radius: 50%;
+  background: #f6f1e6;
+  transition: background-color 160ms ease-out, transform 160ms ease-out;
+}
+.lesson2Page .l2-play-orbit > span.playing { background: var(--gold-soft); border-color: var(--gold); transform: scale(1.08); }
+.lesson2Page .l2-play-orbit > .l1-sound-icon { width: 52px; height: 52px; }
+.lesson2Page .l2-play-orbit.single { min-height: 82px; }
+.lesson2Page .l2-play-orbit.single.playing { color: var(--gold); }
+.lesson2Page .l2-answer-key { max-width: 390px; margin: 8px auto; }
+.lesson2Page .l2-answer-key > strong { display: block; margin-bottom: 4px; font-size: 1.65rem; color: #285e35; }
+
+.lesson2Page .l2-anonymous-hero {
+  width: 150px;
+  min-height: 132px;
+  margin: 12px auto;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  border: 1px solid var(--kraft);
+  border-radius: 45% 48% 44% 47% / 16px 18px 17px 19px;
+  background: #f6f1e6;
+  color: var(--slate);
+  font-family: inherit;
+}
+.lesson2Page .l2-anonymous-hero strong { font-size: 1.15rem; }
+.lesson2Page .l2-anonymous-hero > span { color: #786d58; font-size: 0.75rem; }
+.lesson2Page .l2-anonymous-hero.as-button { cursor: pointer; }
+.lesson2Page .l2-anonymous-hero.playing { background: var(--gold-soft); border-color: var(--gold); }
+
+.lesson2Page .l2-anonymous-cards {
+  max-width: 350px;
+  margin: 18px auto;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: stretch;
+  gap: 16px;
+}
+.lesson2Page .l2-sound-card {
+  min-width: 0;
+  min-height: 116px;
+  padding: 10px 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  border: 1.5px solid var(--kraft);
+  border-radius: 18px 13px 17px 12px / 13px 18px 12px 17px;
+  background: #f6f1e6;
+  color: var(--slate);
+  font-family: inherit;
+  cursor: pointer;
+  transition: transform 160ms ease-out, background-color 160ms ease-out, border-color 160ms ease-out;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.lesson2Page .l2-sound-card:hover:not(:disabled) { transform: translateY(-2px); background: #f1e9d9; }
+.lesson2Page .l2-sound-card.playing { background: var(--gold-soft); border-color: var(--gold); transform: translateY(-2px); }
+.lesson2Page .l2-sound-card.selected { border: 2px solid var(--gold); background: #fbf6e8; box-shadow: 0 5px 14px rgba(34, 48, 74, 0.1); }
+.lesson2Page .l2-sound-card:disabled { opacity: 0.68; cursor: wait; }
+.lesson2Page .l2-sound-card > span { color: #786d58; font-size: 0.7rem; line-height: 1.35; }
+.lesson2Page .l2-sound-card .l1-sound-icon { width: 34px; height: 34px; }
+
+.lesson2Page .l2-hand-compare {
+  max-width: 300px;
+  height: 150px;
+  margin: 8px auto 14px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 64px;
+  border-bottom: 1px dashed var(--kraft);
+}
+.lesson2Page .l2-hand-compare > div { display: flex; flex-direction: column; align-items: center; color: #786d58; font-size: 0.74rem; transform: translateY(-4px); }
+.lesson2Page .l2-hand-compare > div.higher { transform: translateY(-38px); }
+.lesson2Page .l2-hand-compare > div.active { color: var(--gold); }
+.lesson2Page .l2-hand-compare .l1-hand-drawing { width: 56px; height: 68px; }
+.lesson2Page .l2-hand-compare > div.active .l1-hand-drawing { stroke: var(--gold); }
+
+.lesson2Page .l2-step-board {
+  max-width: 450px;
+  margin: 14px auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+.lesson2Page .l2-step-slot {
+  position: relative;
+  min-height: 92px;
+  padding: 18px 8px 7px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px dashed var(--slate);
+  border-radius: 16px 12px 15px 11px;
+  background: #f6f1e6;
+  color: var(--slate);
+  transition: transform 160ms ease-out, background-color 160ms ease-out, border-color 160ms ease-out;
+}
+.lesson2Page .l2-step-slot.high { width: 74%; }
+.lesson2Page .l2-step-slot.middle { width: 87%; }
+.lesson2Page .l2-step-slot.low { width: 100%; }
+.lesson2Page .l2-step-slot.wrong { border-color: #b25e52; background: #fbf1e7; transform: translateX(4px); }
+.lesson2Page .l2-step-label { position: absolute; top: 4px; left: 10px; color: #786d58; font-size: 0.75rem; }
+.lesson2Page .l2-empty-slot {
+  width: 100%;
+  min-height: 58px;
+  border: 0;
+  background: transparent;
+  color: #786d58;
+  font-family: inherit;
+  cursor: pointer;
+}
+.lesson2Page .l2-step-slot .l2-sound-card { width: min(160px, 100%); min-height: 66px; padding: 4px; flex-direction: row; flex-wrap: wrap; cursor: pointer; }
+.lesson2Page .l2-step-slot .l2-sound-card .l1-sound-icon { width: 28px; height: 28px; }
+.lesson2Page .l2-pending-cards { max-width: 420px; margin: 12px auto 4px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px; }
+.lesson2Page .l2-order-card { min-height: 112px; cursor: grab; }
+.lesson2Page .l2-order-card:active { cursor: grabbing; }
+
+.lesson2Page .l2-three-key-piano {
+  width: 100%;
+  max-width: 390px;
+  height: 148px;
+  margin: 16px auto;
+  padding: 5px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 5px;
+  border-radius: 10px 10px 15px 15px;
+  background: var(--slate);
+  box-shadow: 0 8px 16px rgba(34, 48, 74, 0.1);
+}
+.lesson2Page .l2-piano-key {
+  position: relative;
+  min-width: 0;
+  height: 100%;
+  padding: 10px 4px 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  border: 1px solid #b9b2a4;
+  border-radius: 4px 4px 9px 9px;
+  background: #fffdf7;
+  color: var(--slate);
+  font-family: inherit;
+  cursor: pointer;
+  transition: transform 120ms ease-out, background-color 150ms ease-out, border-color 150ms ease-out;
+  touch-action: manipulation;
+}
+.lesson2Page .l2-piano-key:disabled { opacity: 1; cursor: default; }
+.lesson2Page .l2-piano-key.playing { background: var(--gold-soft); border-color: var(--gold); transform: translateY(3px); }
+.lesson2Page .l2-piano-key.correct { background: #eef7ec; border: 2px solid #4c8c50; color: #285e35; }
+.lesson2Page .l2-piano-key.wrong { background: #fbf1e7; border: 2px dashed #b25e52; color: #7d3831; }
+.lesson2Page .l2-key-index { color: #8a8172; font-size: 0.7rem; }
+.lesson2Page .l2-piano-key strong { font-size: 1.35rem; }
+
+.lesson2Page .l2-solfege-cards { max-width: 430px; margin: 18px auto 10px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.lesson2Page .l2-solfege-card {
+  min-width: 0;
+  min-height: 122px;
+  padding: 9px 5px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  border: 1.5px solid var(--kraft);
+  border-radius: 18px 12px 16px 13px;
+  background: #f6f1e6;
+  color: var(--slate);
+  font-family: inherit;
+  cursor: pointer;
+}
+.lesson2Page .l2-solfege-card.revealed { background: #fffdf7; border-color: var(--slate); }
+.lesson2Page .l2-solfege-card.playing { background: var(--gold-soft); border-color: var(--gold); transform: translateY(-2px); }
+.lesson2Page .l2-solfege-card:disabled { opacity: 0.46; cursor: not-allowed; }
+.lesson2Page .l2-solfege-card.revealed:disabled { opacity: 0.8; }
+.lesson2Page .l2-solfege-card strong { font-size: clamp(1.35rem, 6vw, 1.85rem); }
+.lesson2Page .l2-solfege-card > span:last-child { color: #786d58; font-size: 0.72rem; }
+.lesson2Page .l2-reveal-step { width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center; border: 1px dashed var(--kraft); border-radius: 50%; font-size: 0.72rem; }
+
+.lesson2Page .l2-phrase-banner { max-width: 390px; margin: 12px auto 4px; padding: 10px 14px; display: grid; gap: 3px; border-top: 1px dashed var(--gold); border-bottom: 1px dashed var(--gold); background: #fbf6e8; }
+.lesson2Page .l2-phrase-banner > span { color: #786d58; font-size: 0.78rem; }
+.lesson2Page .l2-phrase-banner > strong { font-size: clamp(1.2rem, 5vw, 1.55rem); letter-spacing: 0.06em; }
+.lesson2Page .l2-segment-support { max-width: 410px; margin: 18px auto 4px; display: grid; gap: 12px; }
+.lesson2Page .l2-segment-choices { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+.lesson2Page .l2-voice-panel { margin-top: 8px; }
+.lesson2Page .l2-voice-panel .l1-echo-stage { min-height: 92px; }
+.lesson2Page .l2-voice-panel .l1-echo-conch { width: 62px; height: 62px; }
+.lesson2Page .l2-voice-panel .l1-order-markers span { width: auto; min-width: 42px; height: auto; min-height: 42px; padding: 3px 6px; flex-direction: column; line-height: 1.15; }
+.lesson2Page .l2-marker-name { display: block; margin-top: 2px; color: #786d58; font-size: 0.62rem; }
+.lesson2Page .l2-completion-copy { max-width: 31em; margin: 0 auto 20px; line-height: 1.9; }
+.lesson2Page .l2-completion-copy p { margin: 3px 0; }
+
+@media (max-width: 480px) {
+  .lesson2Page .l2-three-key-piano { height: 126px; margin: 12px auto; }
+  .lesson2Page .l2-piano-key { padding-bottom: 9px; }
+  .lesson2Page .l2-piano-key strong { font-size: 1.15rem; }
+  .lesson2Page .l2-anonymous-cards { gap: 10px; }
+  .lesson2Page .l2-hand-compare { gap: 48px; }
+  .lesson2Page .l2-step-slot.high { width: 82%; }
+  .lesson2Page .l2-step-slot.middle { width: 91%; }
+  .lesson2Page .l2-step-slot { min-height: 84px; }
+  .lesson2Page .l2-pending-cards { gap: 6px; }
+  .lesson2Page .l2-order-card { min-height: 104px; padding: 7px 3px; }
+  .lesson2Page .l2-sound-card > span { font-size: 0.65rem; }
+  .lesson2Page .l2-solfege-cards { gap: 7px; }
+  .lesson2Page .l2-solfege-card { min-height: 110px; }
+}
